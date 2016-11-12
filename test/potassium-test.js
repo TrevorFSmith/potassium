@@ -44,6 +44,9 @@ kTest.Test = class {
 			}
 		}
 	}
+	/*
+		assert*(...) functions return nothing if the assertion is true and throw an Error if the assertion is false
+	*/
 	assertTrue(value){
 		this.assertionCount += 1
 		if(!value){
@@ -189,7 +192,7 @@ kTest.synchronousFetch = function(url){
 }
 
 /*
-	Run the tests for Be itself, including testing k.DataModel and k.DataCollection
+	Run the tests for Potassium itself, including testing k.DataModel and k.DataCollection
 */
 kTest.testPotassium = function(){
 	kTest.K_TESTS.push(new kTest.Test("Events test", (test) => {
