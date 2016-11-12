@@ -1,0 +1,480 @@
+"use strict"
+/*
+
+	Potassium is a reactive element framework.
+	It handles server backed data: k.DataModel and k.DataCollection
+	It handles UI logic: k.Component
+	It includes a DOM manipulation tool: k.el
+	It has a test suite in potassium-test.js
+	See http://PotassiumES.com/ for documentation and examples.
+
+*/
+
+var k = {}; // Potassium root object, named k because that is potassium's symbol on the periodic table. 
+
+/*
+	EventListener holds information about listeners on an object with the eventMixin
+*/
+k.EventListener = class {
+	constructor(eventName, callback){
+		this.eventName = eventName
+		this.callback = callback
+	}
+	matches(eventName){
+		return this.eventName === "all" || eventName === this.eventName
+	}
+	distributeEvent(eventName, ...params){
+		if(this.matches(eventName)){
+			this.callback(eventName, ...params)
+		}
+	}
+}
+
+/*
+	Mix in k.eventMixin to enable the instances to track event listeners and send them events
+	Use it like so: var YourClass = k.eventMixin(class { ... })
+	See k.DataObject for an example.
+*/
+k.eventMixin = Base => class extends Base {
+	trigger(eventName, ...params){
+		// Send an event to listeners
+		for(let listener of this.listeners){
+			listener.distributeEvent(eventName, ...params)
+		}
+	}
+	addListener(callback, eventName="all"){
+		this.listeners.push(new k.EventListener(eventName, callback))
+	}
+	removeListener(callback, eventName=null){
+		let remove = false
+		for(var i=0; i < this.listeners.length; i++){
+			remove = false
+			if(this.listeners[i].callback === callback){
+				if(eventName == null){
+					remove = true
+				} else if(this.listeners[i].matches(eventName)) {
+					remove = true
+				}
+			}
+			if(remove){
+				this.listeners.splice(i, 1)
+				i -= 1
+			}
+		}
+	}
+	clearListeners(){
+		this._listeners.length = 0
+	}
+	get listeners(){
+		// Returns an array of EventListener instances
+		if(typeof this._listeners == "undefined"){
+			this._listeners = []
+		}
+		return this._listeners
+	}
+	clearListeners(){
+		if(this._listeners){
+			this._listeners.length = 0
+		}
+	}
+}
+
+/*
+	The parent class for k.DataModel and k.DataCollection
+	It holds the event mixin and the generic function of fetching data from a remote service
+*/
+k.DataObject = k.eventMixin(class {
+	constructor(options={}){
+		this.options = options
+	}
+	cleanup(){
+		this.clearListeners()
+	}
+
+	// Return the URL (relative or full) as a string for the endpoint used by this.fetch
+	get url(){
+		throw new Error("Extending classes must implement url()")
+	}
+
+	// Clear out old data and set it to data
+	reset(data={}){
+		throw new Error("Extending classes must implement reset")
+	}
+	parse(data){
+		// Extending classes can override this to parse the data received via a fetch
+		return data
+	}
+	equals(obj){
+		// Extending classes can override this to allow less strict equality
+		return this === obj
+	}
+	fetch(){
+		// Ask the server for data for this model or collection
+		return new Promise(function(resolve, reject){
+			this.trigger("fetching", this)
+			fetch(this.url).then(response => response.json()).then(data => {
+				data = this.parse(data)
+				this.reset(data)
+				this.trigger("fetched", this, data, null)
+				resolve()
+			}).catch(err => {
+				this.trigger("fetched", this, null, err)
+				reject(err)
+			})
+		}.bind(this))
+	}
+})
+
+k._NO_CHANGE = Symbol()
+
+/*
+	DataModel holds a map of string,value pairs, sometimes fetched from or sent to a back-end server.
+	It fires events when values are changed.
+
+	options:
+		fieldDataObjects ({}): a map of fieldName (string) to k.DataObject (class), used to create sub-object in this Model's data
+*/
+k.DataModel = class extends k.DataObject {
+	constructor(data={}, options={}){
+		super(options)
+		if(typeof this.options.fieldDataObjects === "undefined"){
+			this.options.fieldDataObjects = {}
+		}
+		this.data = data || {}
+	}
+	cleanup() {
+		super.cleanup()
+		this.data = null
+	}
+	/* 
+		Find a value held within this k.DataModel. 
+		Return values may be native types or, if mapped by options.fieldDataObjects, another k.DataObject
+	*/
+	get(fieldName, defaultValue=null){
+		if(typeof this.data[fieldName] === "undefined" || this.data[fieldName] === null || this.data[fieldName] === ""){
+			return defaultValue
+		}
+		return this.data[fieldName]
+	}
+	// Set a key/value pair.
+	set(fieldName, value){
+		var batch = {}
+		batch[fieldName] = value
+		return this.setBatch(batch)
+	}
+	/*
+		Set a group of values. The 'values' parameter should be an object that works in for(key in values) loops like a dictionary: {}
+		If a key is in options.fieldDataObjects then the value will be used to contruct a k.DataObject and that will be the saved value.
+	*/
+	setBatch(values){
+		let changes = {}
+		let changed = false
+		for(let key in values){
+			let result = this._set(key, values[key])
+			if(result !== k._NO_CHANGE){
+				changed = true
+				changes[key] = result
+				this.trigger(`changed:${key}`, this, key, result)
+			}
+		}
+		if(changed){
+			this.trigger("changed", this, changes)
+		}
+		return changes
+	}
+	_set(fieldName, data){
+		if(data instanceof k.DataObject){
+			if(this.data[fieldName] instanceof k.DataObject){
+				this.data[fieldName].reset(data.data)
+			} else {
+				this.data[fieldName] = data
+			}
+		} else if(this.options.fieldDataObjects[fieldName]){
+			if(this.data[fieldName]){
+				this.data[fieldName].reset(data)
+			} else {
+				this.data[fieldName] = new this.options.fieldDataObjects[fieldName](data);					
+			}
+		} else {
+			if(this.data[fieldName] === data){
+				return k._NO_CHANGE
+			}
+			if(this.data[fieldName] instanceof k.DataObject){
+				this.data[fieldName].reset(data)
+			} else {
+				this.data[fieldName] = data
+			}
+		}
+		return this.data[fieldName]
+	}
+	reset(data={}){
+		for(var key in this.data){
+			if(typeof data[key] === "undefined"){
+				this.data[key] = null
+			}
+		}
+		this.setBatch(data)
+	}
+	equals(obj){
+		if(obj === null || typeof obj === "undefined") return false
+		if(this === obj) return true
+		if(typeof obj !== typeof this) return false
+		if(obj.get('id') === this.get('id')) return true
+		return false
+	}
+}
+
+/*
+	DataCollection represents an ordered list of k.DataModel instances
+
+	options:
+		dataObject (DataModel): the k.DataObject extending class to use to wrap each data item in this collection
+*/
+k.DataCollection = class extends k.DataObject {
+	constructor(data=[], options={}){
+		super(options)
+		this.dataObjects = []
+		for(let datum of data){
+			this.add(this.generateDataObject(datum))
+		}
+	}
+	cleanup(){
+		super.cleanup()
+		this.dataObjects.length = 0
+	}
+	at(index){
+		if(index < 0 || index > this.dataObjects.length - 1){
+			throw new Error("Index out of range: ${index}")
+		}
+		return this.dataObjects[index]
+	}
+	add(dataObject){
+		if(dataObject instanceof k.DataObject == false){
+			dataObject = this.generateDataObject(dataObject)
+		}
+		if(this.dataObjects.indexOf(dataObject) !== -1){ // TODO stop using indexOf because equality doesn't work
+			return
+		}
+		this.dataObjects.push(dataObject)
+		this.trigger("added", this, dataObject)
+	}
+	// Add an array of k.DataObjects to the end of the collection
+	addBatch(dataObjects){
+		for(let dataObject in dataObjects){
+			if(dataObject instanceof k.DataObject == false){
+				dataObject = this.generateDataObject(dataObject)
+			}
+			this.add(dataObject)
+		}
+	}
+	indexOf(dataObject){
+		for(var i=0; i < this.dataObjects.length; i++){
+			if(this.dataObjects[i].equals(dataObject)){
+				return i
+			}
+		}
+		return -1
+	}
+	remove(dataObject){
+		let index = this.indexOf(dataObject)
+		if(index === -1){
+			return
+		}
+		this.dataObjects.splice(index, 1)
+		this.trigger("removed", this, dataObject)
+	}
+	reset(data){
+		for(let obj of this.dataObjects.slice()){
+			this.remove(obj)
+		}
+		for(let datum of data){
+			this.add(this.generateDataObject(datum))
+		}
+		this.trigger("reset", this)
+	}
+	*[Symbol.iterator](){
+		for(let obj of this.dataObjects){
+			yield obj
+		}
+	}
+	get length(){
+		return this.dataObjects.length
+	}
+	generateDataObject(data){
+		let options = { collection: this }
+		if(this.options.dataObject){
+			return new this.options.dataObject(data, options)
+		}
+		return new k.DataModel(data, options)
+	}
+}
+
+/*
+	Component holds the reactive logic for a DOM element
+*/
+k.Component = k.eventMixin(class {
+	constructor(dataObject=null, options={}){
+		this.dataObject = dataObject // a k.DataModel or k.DataCollection
+		this.options = options
+		if(typeof this.options.el !== "undefined"){
+			this.el = this.options.el;
+		} else {
+			this.el = k.el.div()
+		}
+		this.boundCallbacks = [] // { callback, dataObject } to be unbound during cleanup
+		this._el.component = this
+	}
+	cleanup(){
+		super.cleanup()
+		for(let bindInfo of this.boundCallbacks){
+			bindInfo.dataObject.removeListener(bindInfo.callback)
+		}
+	}
+	// The root DOM element
+	get el(){ 
+		return this._el
+	}
+	set el(domElement){
+		if(!domElement || domElement.nodeType !== 1){
+			throw new Error(`Tried to set a non-DOM element to Component.el: ${domElement}: ${domElement.nodeType}`);
+		}
+		if(this._el){
+			delete this._el["component"]
+		}
+		this._el = domElement
+		this._el.component = this
+		this.trigger(k.Component.ElementChangedEvent, this, this._el)
+	}
+	/*
+		Set the targetElement.innerText to the value of dataObject.get(fieldName) as it changes
+		dataObject defaults to this.dataObject but can be any k.DataModel or k.DataCollection
+		formatter defaults to the identity function but can be any function that accepts the value and returns a string
+	*/
+	bindText(fieldName, targetElement, formatter=null, dataObject=this.dataObject){
+		if(formatter === null){
+			formatter = (value) => {
+				if(value === null) return ""
+				if(typeof value === "string") return value
+				return "" + value
+			}
+		}
+		let callback = () => {
+			let result = formatter(dataObject.get(fieldName))
+			targetElement.innerText = typeof result === "string" ? result : ""
+		}
+		dataObject.addListener(callback, `changed:${fieldName}`)
+		callback()
+		this.boundCallbacks.push({
+			callback: callback,
+			dataObject: dataObject
+		})
+	}
+	/*
+		Set the attributeName attribute of targetElement to the value of dataObject.get(fieldName) as it changes
+		formatter defaults to the identity function but can be any function that accepts the value and returns a string
+	*/
+	bindAttribute(fieldName, targetElement, attributeName, formatter=null, dataObject=this.dataObject){
+		if(formatter === null){
+			formatter = (value) => {
+				if(value === null) return ""
+				if(typeof value === "string") return value
+				return "" + value
+			}
+		}
+		let callback = () => {
+			targetElement.setAttribute(attributeName, formatter(dataObject.get(fieldName)));
+		}
+		dataObject.addListener(callback, `changed:${fieldName}`)
+		callback()
+		this.boundCallbacks.push({
+			callback: callback,
+			dataObject: dataObject
+		})
+	}
+})
+k.Component.ElementChangeEvent = "element-changed";
+
+/*
+	Functions that generate DOM elements like k.el.div(...) will live in k.el
+*/
+k.el = {};
+
+/*
+	domElementFunction is the behind the scenes logic for the functions like k.el.div(...)
+	Below you will find the loop that uses domElementFunction
+*/
+k.el.domElementFunction = function(tagName, ...params){
+	// Create a boring DOM element
+	let el = document.createElement(tagName)
+
+	// A convenience function to allow chaining like `let fooDiv = k.el.div().appendTo(document.body)`
+	el.appendTo = function(parent){
+		parent.appendChild(el)
+		return el
+	}
+
+	// A convenience function to allow appending strings, dictionaries of attributes, arrays of subchildren, or children
+	el.append = function(child=null){
+		if(child === null){ return }
+		if(typeof child === "string"){
+			this.appendChild(document.createTextNode(child))
+		} else if(Array.isArray(child)){
+			for(let subChild of child){
+				this.append(subChild)
+			}
+		// If it's an object but not a DOM element, consider it a dictionary of attributes
+		} else if(typeof child === "object" && typeof child.nodeType === "undefined"){
+			for(let key in child){
+				if(child.hasOwnProperty(key) == false){
+					continue
+				}
+				this.setAttribute(key, child[key])
+			}
+		} else {
+			this.appendChild(child)
+		}
+		return el
+	}
+
+	// Convenience functions to add and remove classes from this element without duplication
+	el.addClass = function(className){
+		// TODO
+	}
+	el.removeClass = function(className){
+		// TODO
+	}
+
+	// Append the children parameters
+	for(let child of params){
+		el.append(child)
+	}
+	return el
+}
+
+/* 
+	The tag names that will be used below to generate all of the element generating functions like k.el.div(...)
+	These names were ovingly copied from the excellent Laconic.js 
+	https://github.com/joestelmach/laconic/blob/master/laconic.js
+*/
+k.el.TAGS = ['a', 'abbr', 'address', 'area', 'article', 'aside', 'audio', 'b',
+	'base', 'bdo', 'blockquote', 'body', 'br', 'button', 'canvas', 'caption',
+	'cite', 'code', 'col', 'colgroup', 'command', 'datalist', 'dd', 'del',
+	'details', 'dfn', 'div', 'dl', 'dt', 'em', 'embed', 'fieldset',
+	'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5',
+	'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'i', 'iframe', 'img',
+	'input', 'ins', 'keygen', 'kbd', 'label', 'legend', 'li', 'link', 'map',
+	'mark', 'menu', 'meta', 'meter', 'nav', 'noscript', 'object', 'ol',
+	'optgroup', 'option', 'output', 'p', 'picture', 'param', 'pre', 'progress', 
+	'q', 'rp', 'rt', 'ruby', 's', 'samp', 'script', 'section', 'select', 
+	'small', 'source', 'span', 'strong', 'style', 'sub', 'summary', 'sup', 
+	'table', 'tbody', 'td', 'textarea', 'tfoot', 'th', 'thead', 'time', 'title',
+	'tr', 'ul', 'var', 'video', 'wbr']
+
+// This loop generates the element generating functions like k.el.div(...)
+for(let tag of k.el.TAGS){
+	let innerTag = tag
+	k.el[innerTag] = function(...params){
+		return k.el.domElementFunction(innerTag, ...params)
+	}
+}
+
