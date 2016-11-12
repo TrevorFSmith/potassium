@@ -3,7 +3,7 @@
 	Tests for PotassiumES (see potassium.js)
 */
 
-var kTest = {};
+var kTest = {}
 
 // KTests to be run by k.tests.runKTests()
 kTest.K_TESTS = []
@@ -145,22 +145,22 @@ kTest.SynchronousPromise = class {
 		this.rejectFunction = rejectFunction
 	}
 	then(func){
-		let result = null;
+		let result = null
 		if(this.resolveFunction){
 			result = func(this.resolveFunction())
 		}
 		return new kTest.SynchronousPromise(()=> {
-			return result;
-		});
+			return result
+		})
 	}
 	catch(func){
-		let result = null;
+		let result = null
 		if(this.rejectFunction){
 			result = func(this.rejectFunction())
 		}
 		return new kTest.SynchronousPromise(() => {
-			return result;
-		});
+			return result
+		})
 	}
 }
 
@@ -178,7 +178,7 @@ kTest.MockResponse = class {
 }
 
 // Load this up with <url string, { data: responseData, status: INT }> for synchronousFetch to use
-kTest.SynchronousFetchMap = new Map();
+kTest.SynchronousFetchMap = new Map()
 
 // This is used in setup and teardown of kTest.Tests to replace window.fetch with a synchronous version that is easier to test
 kTest.synchronousFetch = function(url){
@@ -262,7 +262,7 @@ kTest.testPotassium = function(){
 		test.assertEqual(receivedEvents[3].eventName, "changed:pink")
 		test.assertEqual(receivedEvents[4].eventName, "changed")
 		model.set("dink", "donk")
-		test.assertEqual(receivedEvents.length, 5); // Set to same value, should trigger no events
+		test.assertEqual(receivedEvents.length, 5) // Set to same value, should trigger no events
 
 		model.set("flowers", [{ petals: 5 }, { petals: 6 }])
 		test.assertInstanceOf(model.get("flowers"), FlowersCollection)
@@ -329,30 +329,30 @@ kTest.testPotassium = function(){
 	kTest.K_TESTS.push(new kTest.Test("SynchronousFetch", 
 		(test) => {
 			kTest.SynchronousFetchMap.set("foo", { foo:"bar"})
-			var thenCount = 0;
+			var thenCount = 0
 			fetch("foo").then(r => r.json()).then(data => {
-				thenCount += 1;
+				thenCount += 1
 				test.assertEqual(data.status, 200)
 				test.assertEqual(data.foo, "bar")
 			}).catch(() => {
 				throw new Error("Should not have caught on this promise.")
-			});
+			})
 
 			fetch("bogus").then(r => r.json()).then(data => {
-				thenCount += 1;
+				thenCount += 1
 				test.assertEqual(data.status, 404)
 			}).catch(() => {
 				throw new Error("Should not have caught on this promise.")
-			});
-			test.assertEqual(thenCount, 2); // Make sure we reached the then functions
+			})
+			test.assertEqual(thenCount, 2) // Make sure we reached the then functions
 		},
 		(test) => {
-			this.originalFetch = window.fetch;
-			window.fetch = kTest.synchronousFetch;
-			kTest.SynchronousFetchMap.clear();
+			this.originalFetch = window.fetch
+			window.fetch = kTest.synchronousFetch
+			kTest.SynchronousFetchMap.clear()
 		},
 		(test) => {
-			window.fetch = this.originalFetch;
+			window.fetch = this.originalFetch
 		}
 	))
 	kTest.K_TESTS.push(new kTest.Test("Component configuration", (test) => {

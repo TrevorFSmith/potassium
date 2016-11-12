@@ -10,7 +10,7 @@
 
 */
 
-var k = {}; // Potassium root object, named k because that is potassium's symbol on the periodic table. 
+var k = {} // Potassium root object, named k because that is potassium's symbol on the periodic table of elements
 
 /*
 	EventListener holds information about listeners on an object with the eventMixin
@@ -193,7 +193,7 @@ k.DataModel = class extends k.DataObject {
 			if(this.data[fieldName]){
 				this.data[fieldName].reset(data)
 			} else {
-				this.data[fieldName] = new this.options.fieldDataObjects[fieldName](data);					
+				this.data[fieldName] = new this.options.fieldDataObjects[fieldName](data)
 			}
 		} else {
 			if(this.data[fieldName] === data){
@@ -317,7 +317,7 @@ k.Component = k.eventMixin(class {
 		this.dataObject = dataObject // a k.DataModel or k.DataCollection
 		this.options = options
 		if(typeof this.options.el !== "undefined"){
-			this.el = this.options.el;
+			this.el = this.options.el
 		} else {
 			this.el = k.el.div()
 		}
@@ -336,7 +336,7 @@ k.Component = k.eventMixin(class {
 	}
 	set el(domElement){
 		if(!domElement || domElement.nodeType !== 1){
-			throw new Error(`Tried to set a non-DOM element to Component.el: ${domElement}: ${domElement.nodeType}`);
+			throw new Error(`Tried to set a non-DOM element to Component.el: ${domElement}: ${domElement.nodeType}`)
 		}
 		if(this._el){
 			delete this._el["component"]
@@ -382,7 +382,7 @@ k.Component = k.eventMixin(class {
 			}
 		}
 		let callback = () => {
-			targetElement.setAttribute(attributeName, formatter(dataObject.get(fieldName)));
+			targetElement.setAttribute(attributeName, formatter(dataObject.get(fieldName)))
 		}
 		dataObject.addListener(callback, `changed:${fieldName}`)
 		callback()
@@ -392,12 +392,12 @@ k.Component = k.eventMixin(class {
 		})
 	}
 })
-k.Component.ElementChangeEvent = "element-changed";
+k.Component.ElementChangeEvent = "element-changed"
 
 /*
 	Functions that generate DOM elements like k.el.div(...) will live in k.el
 */
-k.el = {};
+k.el = {}
 
 /*
 	domElementFunction is the behind the scenes logic for the functions like k.el.div(...)
