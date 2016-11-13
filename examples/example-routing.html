@@ -1,0 +1,141 @@
+<html>
+<!--
+	This HTML file demonstrates all of the major pieces of Potassium:
+	- DOM manipulation with k.el
+	- Reactive graphical components with k.Component
+	- URL routing with k.Router
+	- Active data models with k.DataModel
+
+	The code and comments below will step you through the process of:
+	- Defining a new k.Component that will control the UI on this page
+	- Create a new k.DataModel and bind some UI elements to its values
+	- Show different UI elements as the user clicks on links to new URLs
+
+-->
+	<head>
+		<meta charset="utf-8">
+		<link rel="stylesheet" href="examples.css" type='text/css'>
+		<style>
+			a { 
+				display: inline-block;
+				vertical-align: top;
+				margin: 10px 10px 20px 0;
+			}
+			.going-up {
+				background-color: #FDD;
+			}
+			.going-down {
+				background-color: #DFD;
+			}
+		</style>
+		<script src="../potassium.js"></script>
+	</head>
+	<body>
+		<div id="target"></div>
+		<script>
+			// Define a new Component class that will manage the content on the page
+			class PageComponent extends k.Component {
+				constructor(dataObject=null, options={}){
+					super(dataObject, options)
+
+					// Create a URL router and add some URLs to route
+					this.router = new k.Router()
+					this.router.addRoute(/^$/, "root")
+					this.router.addRoute(/^page\/(up|down)$/, "page")
+
+					// Add links that will change the document.location hash which triggers the router
+					k.el.a(
+						{ class:"tab", href:"#" }, 
+						"Main tab"
+					).appendTo(this.el)
+
+					/*
+					These next two links include a regex group (up or down) that is included 
+					with the routing event (see below)
+					*/
+					let pageUpTab = k.el.a(
+						{ class:"tab", href:"#page/up" }, 
+						"Page up tab"
+					).appendTo(this.el)
+					let pageDownTab = k.el.a(
+						{ class:"tab", href:"#page/down" }, 
+						"Page down tab"
+					).appendTo(this.el)
+
+					/* 
+					Listen to the click event on the page up and down tabs and increment 
+					or decrement this.dataObject's "pageCount" value
+					*/
+					this.listenTo("click", pageUpTab, () => {
+						this.dataObject.increment("pageCount")
+					})
+					this.listenTo("click", pageDownTab, () => {
+						this.dataObject.increment("pageCount", -1)
+					})
+
+					// These section elements will be shown and hidden according to events from the router
+
+					// Main element
+					this.mainEl = k.el.div(
+						{ class:"section" }, 
+						k.el.h1("Main section"),
+						k.el.p("View this page's source for a step by step guide")
+					).appendTo(this.el)
+
+					// Page element with page count sub-element
+					this.pageEl = k.el.div(
+						{ class:"section" }, 
+						k.el.h1("Page section")
+					).appendTo(this.el)
+					this.pageCountEl = k.el.span().appendTo(this.pageEl)
+
+					// Bind the innerText of pageCountEl to the value of this.dataObject's "pageCount" field
+					this.bindText("pageCount", this.pageCountEl)
+
+					// Listen for routing events
+					this.router.addListener(this.handleRoutes.bind(this))
+
+					// Start routing!
+					this.router.start()
+				}
+				handleRoutes(eventName, path, ...params){
+
+					// First, hide all of the elements with "section" class
+					for(let el of this.el.getElementsByClassName("section")){
+						el.style.display = "none"
+					}
+
+					/*
+					Then, show the section that corresponds to the event
+					"root", "page", and "flowers" were defined with the routes that we added to the router above
+					*/
+					switch(eventName){
+						case "root":
+							this.mainEl.style.display = "block"
+							break
+						case "page":
+							/*
+							Each (group) in a matched route regex is passed as a parameter to the event
+							In this case, it's either "up" or "down" so we change the pageEl classes accordingly
+							*/
+							if(params[0] === "up"){
+								this.pageEl.addClass("going-up").removeClass("going-down")
+							} else if (params[0] === "down"){
+								this.pageEl.removeClass("going-up").addClass("going-down")
+							}
+							this.pageEl.style.display = "block"
+							break
+						default:
+							break
+					}
+				}
+			}
+
+			// Create an instance of PageComponent
+			var model = new k.DataModel({ pageCount: 0 })
+			var component = new PageComponent(model)
+			// Add the component's root element to the target div
+			document.getElementById("target").appendChild(component.el)
+		</script>
+	</body>
+</html>

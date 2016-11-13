@@ -24,7 +24,7 @@ kTest.Test = class {
 			try {
 				this.setupFunction(this)
 			} catch (e) {
-				console.error("Setup error", e, e.stack)
+				console.error("Setup error", e)
 				return false
 			}
 		}
@@ -32,14 +32,14 @@ kTest.Test = class {
 			this.testFunction(this)
 			return true
 		} catch (e) {
-			console.error("Test error", e, e.stack)
+			console.error("Test error", e)
 			return false
 		} finally {
 			if(typeof this.teardownFunction == 'function'){
 				try {
 					this.teardownFunction(this)
 				} catch (e) {
-					console.error("Teardown error", e, e.stack)
+					console.error("Teardown error", e)
 				}
 			}
 		}
@@ -51,6 +51,15 @@ kTest.Test = class {
 		this.assertionCount += 1
 		if(!value){
 			throw new Error(`${value} is not true`)
+		}
+	}
+	assertType(value, typeName){
+		this.assertionCount += 1
+		if(value == null){
+			throw new Error(`${value} is null, so it not of type ${typeName}`)
+		}
+		if(typeof value !== typeName){
+			throw new Error(`${value} is of type ${typeof value}, not ${typeName}`)
 		}
 	}
 	assertInstanceOf(value, clazz){
@@ -79,7 +88,7 @@ kTest.Test = class {
 			}
 		}
 		if(val1 == null){
-			return true
+			return
 		}
 		if(typeof val1 == "undefined"){
 			if(typeof val2 !== "undefined"){
@@ -92,7 +101,7 @@ kTest.Test = class {
 			}
 		}
 		if(typeof val1 == "undefined"){
-			return true
+			return
 		}
 		if(typeof val1.equals == "function"){
 			if(val1.equals(val2) == false){
@@ -102,6 +111,7 @@ kTest.Test = class {
 		else if(val1 != val2){
 			throw new Error(`${val1} != ${val2}`)
 		}
+		return
 	}
 	assertNotEqual(val1, val2){
 		this.assertionCount += 1
@@ -227,14 +237,14 @@ kTest.testPotassium = function(){
 		model.removeListener(listener, "changed:baz")
 		receivedEvents.length = 0
 		model.set("baz", 43)
-		test.assertEqual(receivedEvents.length, 2) // Should only match the "all" listener from above
+		test.assertEqual(receivedEvents.length, 2) // Should only match the k.ALL_EVENTS listener from above
 
 		model.cleanup()
 		receivedEvents.length = 0
 		model.trigger("changed:foo", model, "foo")
 		test.assertEqual(receivedEvents.length, 0)
 	}))
-	kTest.K_TESTS.push(new kTest.Test("Model events", (test) => {
+	kTest.K_TESTS.push(new kTest.Test("DataModel", (test) => {
 		class FlowersCollection extends k.DataCollection {}
 		let model = new k.DataModel(null, {
 			fieldDataObjects: { flowers: FlowersCollection }
@@ -279,6 +289,19 @@ kTest.testPotassium = function(){
 		test.assertInstanceOf(model.get("subModel"), k.DataModel)
 		test.assertEqual(model.get("subModel").get("cheese"), "tall")
 		test.assertEqual(model.get("subModel").get("mesmer"), null)
+
+		receivedEvents.length = 0
+		model.increment("pageCount") // Creates the field since it doesn't exist
+		test.assertEqual(model.get("pageCount"), 1)
+		test.assertEqual(receivedEvents.length, 2)
+		test.assertEqual(receivedEvents[0].eventName, "changed:pageCount")
+		receivedEvents.length = 0
+		model.increment("pageCount", -2)
+		test.assertEqual(model.get("pageCount"), -1)
+		test.assertEqual(receivedEvents.length, 2)
+		test.assertEqual(receivedEvents[0].eventName, "changed:pageCount")
+		model.increment("pageCount", 10)
+		test.assertEqual(model.get("pageCount"), 9)
 	}))
 	kTest.K_TESTS.push(new kTest.Test("DataCollection", (test) => {
 		let col1 = new k.DataCollection()
@@ -355,7 +378,37 @@ kTest.testPotassium = function(){
 			window.fetch = this.originalFetch
 		}
 	))
-	kTest.K_TESTS.push(new kTest.Test("Component configuration", (test) => {
+	kTest.K_TESTS.push(new kTest.Test("DOM manipulation", (test) => {
+		let el1 = k.el.div()
+
+		// Add and remove classes
+		test.assertType(el1.removeClass, "function")
+		test.assertType(el1.addClass, "function")
+		test.assertEqual(el1.addClass("foo").nodeType, 1)
+		test.assertEqual(el1.getAttribute("class"), "foo")
+		el1.addClass("bar")
+		test.assertEqual(el1.getAttribute("class"), "foo bar")
+		test.assertEqual(el1.removeClass("foo").nodeType, 1)
+		test.assertEqual(el1.getAttribute("class"), "bar")
+		el1.removeClass("bar")
+		test.assertEqual(el1.getAttribute("class"), null) // Removing the last class removes the attribute
+
+		el1.addClass("blinz")
+		el1.addClass("batz")
+		test.assertEqual(el1.getAttribute("class"), "blinz batz")
+		el1.removeClass("batz")
+		test.assertEqual(el1.getAttribute("class"), "blinz")
+
+		let el2 = k.el.span().appendTo(el1)
+		test.assertEqual(el1.children.length, 1)
+		test.assertEqual(el1.children[0], el2)
+
+		let el3 = k.el.div({ foo:"bar" }, "Howdy", k.el.span("Moo"))
+		test.assertEqual(el3.childNodes[0].text, "Howdy")
+		test.assertEqual(el3.getAttribute("foo"), "bar")
+		test.assertEqual(el3.children[0].innerText, "Moo")
+	}))
+	kTest.K_TESTS.push(new kTest.Test("Component", (test) => {
 		let component1 = new k.Component()
 		component1.el = document.createElement("bogus")
 		test.assertEqual(component1.el.tagName.toLowerCase(), "bogus")
@@ -402,6 +455,52 @@ kTest.testPotassium = function(){
 
 		model1.set("blart", "floop")
 		test.assertEqual(c2.el.getAttribute("bluez"), "floop")
+		c2.cleanup()
+	}))
+	kTest.K_TESTS.push(new kTest.Test("Router", (test) => {
+		let router = new k.Router()
+		let receivedEvents = []
+		router.addListener((eventName, target, ...params) => {
+			receivedEvents.push({ eventName: eventName, target:target, params:params })
+		})
+		router.addRoute(/^$/, "splash", { foo: "bar" }, "tinkle")
+		router.addRoute(/^tos$/, "terms-of-service")
+		router.addRoute(/^blog\/([0-9]+)$/, "blog", { hello:"nurse" })
+		router.addRoute(/^blog\/([0-9]+)\/post\/([0-9a-zA-Z]+)$/, "post")
+		test.assertEqual(receivedEvents.length, 0)
+
+		router.start()
+		test.assertEqual(receivedEvents.length, 1)
+		test.assertEqual(receivedEvents[0].eventName, "splash")
+		test.assertEqual(receivedEvents[0].params[0].foo, "bar")
+
+		receivedEvents.length = 0
+		router._handleNewPath("bogus")
+		test.assertEqual(receivedEvents.length, 1)
+		test.assertEqual(receivedEvents[0].eventName, k.Router.UnknownRouteEvent)
+		test.assertEqual(receivedEvents[0].params.length, 0)
+
+		receivedEvents.length = 0
+		router._handleNewPath("blog/23")
+		test.assertEqual(receivedEvents.length, 1)
+		test.assertEqual(receivedEvents[0].eventName, "blog")
+		test.assertEqual(receivedEvents[0].params[0], "23")
+		test.assertEqual(receivedEvents[0].params[1].hello, "nurse")
+
+		receivedEvents.length = 0
+		router._handleNewPath("blog/23/post/alphaZ")
+		test.assertEqual(receivedEvents.length, 1)
+		test.assertEqual(receivedEvents[0].eventName, "post")
+		test.assertEqual(receivedEvents[0].params[0], "23")
+		test.assertEqual(receivedEvents[0].params[1], "alphaZ")
+
+		router.cleanup()
+	},
+	() => {
+		document.location.hash = ""
+	},
+	() => {
+		document.location.hash = ""
 	}))
 
 	kTest.runAndLog()

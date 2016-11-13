@@ -21,7 +21,7 @@ k.EventListener = class {
 		this.callback = callback
 	}
 	matches(eventName){
-		return this.eventName === "all" || eventName === this.eventName
+		return this.eventName === k.ALL_EVENTS || eventName === this.eventName
 	}
 	distributeEvent(eventName, ...params){
 		if(this.matches(eventName)){
@@ -30,19 +30,21 @@ k.EventListener = class {
 	}
 }
 
+k.ALL_EVENTS = Symbol("all events")
+
 /*
 	Mix in k.eventMixin to enable the instances to track event listeners and send them events
 	Use it like so: var YourClass = k.eventMixin(class { ... })
 	See k.DataObject for an example.
 */
 k.eventMixin = Base => class extends Base {
+	// Send an event to listeners
 	trigger(eventName, ...params){
-		// Send an event to listeners
 		for(let listener of this.listeners){
 			listener.distributeEvent(eventName, ...params)
 		}
 	}
-	addListener(callback, eventName="all"){
+	addListener(callback, eventName=k.ALL_EVENTS){
 		this.listeners.push(new k.EventListener(eventName, callback))
 	}
 	removeListener(callback, eventName=null){
@@ -125,7 +127,7 @@ k.DataObject = k.eventMixin(class {
 	}
 })
 
-k._NO_CHANGE = Symbol()
+k._NO_CHANGE = Symbol("no change")
 
 /*
 	DataModel holds a map of string,value pairs, sometimes fetched from or sent to a back-end server.
@@ -182,7 +184,12 @@ k.DataModel = class extends k.DataObject {
 		}
 		return changes
 	}
+	increment(fieldName, amount=1){
+		const currentVal = fieldName in this.data ? this.data[fieldName] : 0
+		this.set(fieldName, currentVal + amount)
+	}
 	_set(fieldName, data){
+		// _set does not fire any events, so you probably want to use set or setBatch
 		if(data instanceof k.DataObject){
 			if(this.data[fieldName] instanceof k.DataObject){
 				this.data[fieldName].reset(data.data)
@@ -322,12 +329,16 @@ k.Component = k.eventMixin(class {
 			this.el = k.el.div()
 		}
 		this.boundCallbacks = [] // { callback, dataObject } to be unbound during cleanup
+		this.domEventCallbacks = [] // { callback, eventName, targetEl } to be unregistered during cleanup
 		this._el.component = this
 	}
 	cleanup(){
-		super.cleanup()
+		this.clearListeners()
 		for(let bindInfo of this.boundCallbacks){
 			bindInfo.dataObject.removeListener(bindInfo.callback)
+		}
+		for(let domInfo of this.domEventCallbacks){
+			domInfo.targetEl.removeEventListener(domInfo.eventName, domInfo.callback)
 		}
 	}
 	// The root DOM element
@@ -344,6 +355,24 @@ k.Component = k.eventMixin(class {
 		this._el = domElement
 		this._el.component = this
 		this.trigger(k.Component.ElementChangedEvent, this, this._el)
+	}
+	/*
+		Listen to a DOM event.
+		For example:
+			this.buttonEl = k.el.button()
+			this.listenTo("click", this.buttonEl, this.handleClick)
+	*/
+	listenTo(eventName, targetEl, callback, context=this){
+		let boundCallback = context === null ? callback : callback.bind(context)
+		let info = {
+			eventName: eventName,
+			targetEl: targetEl,
+			originalCallback: callback,
+			context: context,
+			callback: boundCallback
+		}
+		targetEl.addEventListener(eventName, info.callback)
+		this.domEventCallbacks.push(info)
 	}
 	/*
 		Set the targetElement.innerText to the value of dataObject.get(fieldName) as it changes
@@ -395,6 +424,59 @@ k.Component = k.eventMixin(class {
 k.Component.ElementChangeEvent = "element-changed"
 
 /*
+	Router maps window.history events and URL path fragments to events
+	For example, routing "blog/{blogID}/page/{pageID}" to an event with blogID and pageID parameters
+*/
+k.Router = k.eventMixin(class {
+	constructor(){
+		this.routes = [];
+		this.hashListener = this._checkHash.bind(this)
+        window.addEventListener('hashchange', this.hashListener, false)
+	}
+	cleanup(){
+		window.removeEventListener('hashchange', this.hashListener)
+	}
+	addRoute(regex, eventName, ...parameters){
+		this.routes.push(new k._Route(regex, eventName, ...parameters))
+	}
+	start(){
+		this._checkHash()
+	}
+	_checkHash(){
+		this._handleNewPath(document.location.hash.slice(1))
+	}
+	_handleNewPath(path){
+		for(let route of this.routes){
+			let matches = route.matches(path)
+			if(matches == null){
+				continue
+			}
+			this.trigger(route.eventName, ...matches, ...route.parameters)
+			return
+		}
+		this.trigger(k.Router.UnknownRouteEvent, path)
+	}
+})
+k.Router.RouteAddedEvent = "route-added"
+k.Router.StartedRoutingEvent = "started-routing"
+k.Router.UnknownRouteEvent = "unknown-route"
+
+/*
+	_Route tracks routes for k.Router
+*/
+k._Route = class {
+	constructor(regex, eventName, ...parameters){
+		this.regex = regex
+		this.eventName = eventName
+		this.parameters = parameters
+
+	}
+	matches(path){
+		return path.match(this.regex)
+	}
+}
+
+/*
 	Functions that generate DOM elements like k.el.div(...) will live in k.el
 */
 k.el = {}
@@ -409,8 +491,8 @@ k.el.domElementFunction = function(tagName, ...params){
 
 	// A convenience function to allow chaining like `let fooDiv = k.el.div().appendTo(document.body)`
 	el.appendTo = function(parent){
-		parent.appendChild(el)
-		return el
+		parent.appendChild(this)
+		return this
 	}
 
 	// A convenience function to allow appending strings, dictionaries of attributes, arrays of subchildren, or children
@@ -433,15 +515,36 @@ k.el.domElementFunction = function(tagName, ...params){
 		} else {
 			this.appendChild(child)
 		}
-		return el
+		return this
 	}
 
 	// Convenience functions to add and remove classes from this element without duplication
 	el.addClass = function(className){
-		// TODO
+		const classAttribute = this.getAttribute("class") || ""
+		const classes = classAttribute.split(/\s+/)
+		if(classes.indexOf(className) != -1){
+			// Already has that class
+			return this
+		}
+		this.setAttribute("class", (classAttribute + " " + className).trim())
+		return this
 	}
 	el.removeClass = function(className){
-		// TODO
+		let classAttribute = this.getAttribute("class") || ""
+		const classes = classAttribute.split(/\s+/)
+		const index = classes.indexOf(className)
+		if(index == -1){
+			// Already does not have that class
+			return this
+		}
+		classes.splice(index, 1)
+		classAttribute = classes.join(" ").trim()
+		if(classAttribute.length == 0){
+			this.removeAttribute("class")
+		} else {
+			this.setAttribute("class", classes.join(" ").trim())
+		}
+		return this
 	}
 
 	// Append the children parameters

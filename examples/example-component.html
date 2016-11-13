@@ -1,0 +1,45 @@
+<html>
+	<head>
+		<meta charset="utf-8">
+		<link rel="stylesheet" href="examples.css" type='text/css'>
+		<script src="../potassium.js"></script>
+	</head>
+	<body>
+		<div id="target"></div>
+
+		<script>
+			// Define a new Component type, ExampleComponent
+			class ExampleComponent extends k.Component {
+				constructor(dataObject=null, options={}){
+					super(dataObject, options)
+
+					// Create an H1 DOM element and add it to the root element, this.el
+					this.el.appendChild(k.el.h1("Example Component"))
+
+					// Create a DOM element to display the count
+					this.countEl = k.el.div().appendTo(this.el)
+
+					// Bind the "count" field of this.dataObject to this.countEl
+					this.bindText("count", this.countEl)
+
+					// Make a button
+					this.button = k.el.button("Add one").appendTo(this.el)
+
+					// When the button is clicked, increment the "count" value in this.dataObject
+					this.button.addEventListener("click", () => {
+						this.dataObject.set("count", this.dataObject.get("count") + 1)
+					})
+				}
+			}
+
+			// Create a k.DataModel to hold the "count" field
+			var model = new k.DataModel({ count:0 })
+
+			// Create an instance of ExampleComponent with the model
+			var component = new ExampleComponent(model)
+
+			// Add the component's root element to the target div
+			document.getElementById("target").appendChild(component.el)
+		</script>
+	</body>
+</html>
