@@ -52,7 +52,7 @@ Copy potassium.js to your document root and include this in your head element:
 	button.addEventListener("click", (domEvent) => {
 		model.increment("count")
 	})
-[jsfiddle](https://jsfiddle.net/trevorfsmith/4ome2gdL/1/)
+[jsfiddle](https://jsfiddle.net/trevorfsmith/4ome2gdL/3/)
 
 ### Manage collections of data
 
