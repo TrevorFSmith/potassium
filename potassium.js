@@ -1,13 +1,12 @@
 "use strict"
 /*
-
 	Potassium is a reactive element framework.
 	It handles server backed data: k.DataModel and k.DataCollection
 	It handles UI logic: k.Component
 	It includes a DOM manipulation tool: k.el
 	It has a test suite in potassium-test.js
-	See http://PotassiumES.com/ for documentation and examples.
-
+	
+	See https://github.com/TrevorFSmith/potassium/ for documentation and examples.
 */
 
 var k = {} // Potassium root object, named k because that is potassium's symbol on the periodic table of elements
