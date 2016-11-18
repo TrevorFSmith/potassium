@@ -1,12 +1,12 @@
-# Potassium
+# PotassiumES
 
 ## Reactive elements for ES6
 
-Potassium is a modern replacement for heavy weight or aging Javascript libraries for front end data modeling and user interface development. If you like React, Backbone, or Ember but don't care for all of the browser compatibility and build tool baggage they bring with them, then Potassium will be like a breath of fresh air.
+PotassiumES is a modern replacement for heavy weight or aging Javascript libraries for front end data modeling and user interface development. If you like React, Backbone, or Ember but don't care for all of the browser compatibility and build tool baggage they bring with them, then PotassiumES will be like a breath of fresh air.
 
-Potassium takes advantage of the new code patterns of EcmaScript6 to eliminate unnecessary code bulk seen in libraries that need to be work with IE 6. Classes, default and spread parameters, promises, and other aspects of ES6 make Potassium lightweight, fast, and encourages devs to write code that is easy to maintain.
+PotassiumES takes advantage of the new code patterns of EcmaScript6 to eliminate unnecessary code bulk seen in libraries that need to be work with IE 6. Classes, default and spread parameters, promises, and other aspects of ES6 make PotassiumES lightweight, fast, and encourages devs to write code that is easy to maintain.
 
-Unlike pretty much every other reactive library, Potassium has no external dependencies on other libraries like jQuery or build tools like webpack. Place potassium.js into any Javascript environment and go, confident that your code won't break every time a sub-dependency that you don't even directly call is broken in npm.
+Unlike pretty much every other reactive library, PotassiumES has no external dependencies on other libraries like jQuery or build tools like webpack. Place potassium.js into any Javascript environment and go, confident that your code won't break every time a sub-dependency that you don't even directly call is broken in npm.
 
 ## Installation instructions
 
@@ -39,7 +39,7 @@ Copy potassium.js to your document root and include this in your head element:
 
 ### Create Reactive components
 
-	// define a Potassium reactive component to handle a simple dynamic behavior
+	// define a PotassiumES reactive component to handle a simple dynamic behavior
 	class CounterComponent extends k.Component {
 
 		// use default parameters to pass a data model to the constructor 
