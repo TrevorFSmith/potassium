@@ -25,6 +25,7 @@ Copy potassium.js to your document root and include this in your head element:
 		{ class:"parent" }, 
 		"Parent"
 	)
+	
 	// parent is just a DOM element, so simply add it to the document
 	document.getElementById("target").appendChild(parent)
 
@@ -40,15 +41,20 @@ Copy potassium.js to your document root and include this in your head element:
 
 	// define a Potassium reactive component to handle a simple dynamic behavior
 	class CounterComponent extends k.Component {
+
 		// use default parameters to pass a data model to the constructor 
 		constructor(dataObject=new k.DataModel({ count: 0 }), options={}){
 			super(dataObject, options)
+
 			// add a class attribute to the root DOM element of this component, this.el
 			this.el.addClass("counter-component")
+
 			// create a div to display the count and add it to the root element
 			this.countEl = k.el.div().appendTo(this.el)
+
 			// bind the value of "count" in this.dataObject to this.countEl
 			this.bindText("count", this.countEl)
+
 			// add a button and when it is clicked, increase "count" in this.dataObject
 			this.button = k.el.button("Add 1 to count").appendTo(this.el)
 			this.listenTo("click", this.button, () => {
@@ -60,6 +66,9 @@ Copy potassium.js to your document root and include this in your head element:
 	// create an instance of CounterComponent and add it to the "target" div
 	let component = new CounterComponent()
 	document.getElementById("target").appendChild(component.el)
+	
+	// when you're done with the component, call cleanup to disconnect all event listeners (data and DOM)
+	component.cleanup()
 [jsfiddle](https://jsfiddle.net/trevorfsmith/bnd376ve/)
 
 ### Route URLs to events so that components can react
@@ -77,9 +86,11 @@ Copy potassium.js to your document root and include this in your head element:
 
 	// now add a callback to handle the events sent by the router
 	router.addListener((eventName, target, ...params) => {
+	
 		// get and clear the div where we'll write the event info
 		let targetDiv = document.getElementById("target")
 		targetDiv.innerHTML = ""
+
 		// add a couple of divs that display the event info
 		targetDiv.appendChild(k.el.div("Event name: ", eventName))
 		targetDiv.appendChild(k.el.div("Parameters: ", params.join(", ")))
