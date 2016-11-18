@@ -2,7 +2,7 @@
 
 ## Reactive elements for ES6
 
-PotassiumES is a modern replacement for heavy weight or aging Javascript libraries for front end data modeling and user interface development. If you like React, Backbone, or Ember but don't care for all of the browser compatibility and build tool baggage they bring with them, then PotassiumES will be like a breath of fresh air.
+PotassiumES is a modern, reactive replacement for heavy weight or aging Javascript libraries for front end data modeling and user interface development. If you like React, Backbone, or Ember but don't care for all of the browser compatibility and build tool baggage that they bring with them, PotassiumES will be like a breath of fresh air.
 
 PotassiumES takes advantage of the new code patterns of EcmaScript6 to eliminate unnecessary code bulk seen in libraries that need to be work with IE 6. Classes, default and spread parameters, promises, and other aspects of ES6 make PotassiumES lightweight, fast, and encourages devs to write code that is easy to maintain.
 
@@ -17,6 +17,79 @@ Copy potassium.js to your document root and include this in your head element:
 (yes, that's really all it takes)
 
 ## Code examples
+
+### Manage data
+
+	// create a new type of data model that has a custom attribute, countPlus4
+	class MyModel extends k.DataModel {
+		get countPlus4(){
+			return this.get("count") + 4 
+		}
+	}
+
+	// instantiate a MyModel and pass in initial data
+	let model = new MyModel({
+		id: 1,
+		count: 20 
+	})
+
+	// listen to change events on the count field
+	model.addListener(() => {
+
+		// empty the target element
+		let target = document.getElementById("target")
+		target.innerHTML = ""
+
+		// add divs to target with data from the model
+		target.appendChild(k.el.div("id: " + model.get("id")))
+		target.appendChild(k.el.div("count: " + model.get("count")))
+		target.appendChild(k.el.div("count plus 4: " + model.countPlus4))
+
+	}, "changed:count") // select only change events on count
+
+	// when the button is clicked, increment the "count" field on the model
+	let button = document.getElementById("increment-button")
+	button.addEventListener("click", (domEvent) => {
+		model.increment("count")
+	})
+[jsfiddle](https://jsfiddle.net/trevorfsmith/4ome2gdL/1/)
+
+### Manage collections of data
+
+	// create a new type of collection
+	class MyCollection extends k.DataCollection {
+		/* 
+		Here we would normally define where to fetch the data and how to parse it, but for this demo it is not necessary.
+		*/
+	}
+
+	// create a MyCollection instance with two items
+	let collection = new MyCollection([
+		{ id: 1, foo:"I am 1" }, 
+		{ id: 2, foo:"I am 2" }, 
+	])
+
+	// get the first item in the collection, which is a k.DataModel
+	let dataModel = collection.at(0)
+	dataModel.get("id") // returns 1
+	dataModel.get("foo") // returns "baz"
+
+	// listen for collection events and display them in the "target" div
+	collection.addListener((eventName, originator, ...params) => {
+		let targetDiv = document.getElementById("target")
+		targetDiv.appendChild(k.el.div(eventName, ": ", params[0].get("foo")))
+	})
+
+	// when the button is clicked, add a new item to the collection
+	let currentId = 2
+	let addButton = document.getElementById("add-button")
+	addButton.addEventListener("click", (domEvent) => {
+		currentId += 1
+
+		// This triggers an "added" event, handled above
+		collection.add({ id: currentId, foo:"I am " + currentId })
+	})
+[jsfiddle](https://jsfiddle.net/trevorfsmith/16y1gepc/1/)
 
 ### Create DOM elements
 
@@ -37,7 +110,7 @@ Copy potassium.js to your document root and include this in your head element:
 	).appendTo(parent)
 [jsfiddle](https://jsfiddle.net/trevorfsmith/apzc4fw9/)
 
-### Create Reactive components
+### Create reactive components
 
 	// define a PotassiumES reactive component to handle a simple dynamic behavior
 	class CounterComponent extends k.Component {

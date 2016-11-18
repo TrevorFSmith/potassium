@@ -302,6 +302,15 @@ kTest.testPotassium = function(){
 		test.assertEqual(receivedEvents[0].eventName, "changed:pageCount")
 		model.increment("pageCount", 10)
 		test.assertEqual(model.get("pageCount"), 9)
+
+		class ChildModel extends k.DataModel{
+			get countPlusFour() {
+				return this.get("count") + 4
+			}
+		}
+		let parentModel = new k.DataModel({ id:5, child:{ count:20 } }, { fieldDataObjects:{ child:ChildModel } })
+		test.assertInstanceOf(parentModel.get("child"), ChildModel) // child should be mapped to k.DataModel by fieldDataObjects
+		test.assertEqual(parentModel.get("child").countPlusFour, 24)
 	}))
 	kTest.K_TESTS.push(new kTest.Test("DataCollection", (test) => {
 		let col1 = new k.DataCollection()

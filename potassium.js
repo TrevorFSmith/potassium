@@ -141,7 +141,8 @@ k.DataModel = class extends k.DataObject {
 		if(typeof this.options.fieldDataObjects === "undefined"){
 			this.options.fieldDataObjects = {}
 		}
-		this.data = data || {}
+		this.data = {}
+		this.setBatch(data)
 	}
 	cleanup() {
 		super.cleanup()
