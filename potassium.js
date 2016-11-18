@@ -1,6 +1,6 @@
 "use strict"
 /*
-	Potassium is a reactive element framework.
+	PotassiumES is a reactive element framework.
 	It handles server backed data: k.DataModel and k.DataCollection
 	It handles UI logic: k.Component
 	It includes a DOM manipulation tool: k.el
@@ -9,7 +9,7 @@
 	See https://github.com/TrevorFSmith/potassium/ for documentation and examples.
 */
 
-var k = {} // Potassium root object, named k because that is potassium's symbol on the periodic table of elements
+var k = {} // PotassiumES root object, named k because that is potassium's symbol on the periodic table of elements
 
 /*
 	EventListener holds information about listeners on an object with the eventMixin
@@ -424,7 +424,7 @@ k.Component.ElementChangeEvent = "element-changed"
 
 /*
 	Router maps window.history events and URL path fragments to events
-	For example, routing "blog/{blogID}/page/{pageID}" to an event with blogID and pageID parameters
+	For example, routing /^blog\/([0-9]+)\/page\/([0-9a-z]+)$/ to an event with parameters for blog and page IDs
 */
 k.Router = k.eventMixin(class {
 	constructor(){
