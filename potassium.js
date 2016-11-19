@@ -15,9 +15,10 @@ var k = {} // PotassiumES root object, named k because that is potassium's symbo
 	EventListener holds information about listeners on an object with the eventMixin
 */
 k.EventListener = class {
-	constructor(eventName, callback){
+	constructor(eventName, callback, once=false){
 		this.eventName = eventName
 		this.callback = callback
+		this.once = once
 	}
 	matches(eventName){
 		return this.eventName === k.ALL_EVENTS || eventName === this.eventName
@@ -25,7 +26,9 @@ k.EventListener = class {
 	distributeEvent(eventName, ...params){
 		if(this.matches(eventName)){
 			this.callback(eventName, ...params)
+			return true
 		}
+		return false
 	}
 }
 
@@ -39,12 +42,18 @@ k.ALL_EVENTS = Symbol("all events")
 k.eventMixin = Base => class extends Base {
 	// Send an event to listeners
 	trigger(eventName, ...params){
+		var listenersToRemove = [];
 		for(let listener of this.listeners){
-			listener.distributeEvent(eventName, ...params)
+			if(listener.distributeEvent(eventName, ...params) && listener.once){
+				listenersToRemove.push(listener);
+			}
+		}
+		for(let listener of listenersToRemove){
+			this.removeListener(listener.callback, listener.eventName)
 		}
 	}
-	addListener(callback, eventName=k.ALL_EVENTS){
-		this.listeners.push(new k.EventListener(eventName, callback))
+	addListener(callback, eventName=k.ALL_EVENTS, once=false){
+		this.listeners.push(new k.EventListener(eventName, callback, once))
 	}
 	removeListener(callback, eventName=null){
 		let remove = false
@@ -240,6 +249,9 @@ k.DataModel = class extends k.DataObject {
 k.DataCollection = class extends k.DataObject {
 	constructor(data=[], options={}){
 		super(options)
+		this._inReset = false
+		this._inAddBatch = false
+		this._boundRelayListener = this._relayListener.bind(this)
 		this.dataObjects = []
 		for(let datum of data){
 			this.add(this.generateDataObject(datum))
@@ -247,6 +259,9 @@ k.DataCollection = class extends k.DataObject {
 	}
 	cleanup(){
 		super.cleanup()
+		for(let obj of this.dataObjects){
+			obj.removeListener(this._boundRelayListener)
+		}
 		this.dataObjects.length = 0
 	}
 	at(index){
@@ -264,15 +279,24 @@ k.DataCollection = class extends k.DataObject {
 		}
 		this.dataObjects.push(dataObject)
 		this.trigger("added", this, dataObject)
+		if(this._comparator && this._inReset == false && this._inAddBatch == false){
+			this.sort(this._comparator)
+		}
+		dataObject.addListener(this._boundRelayListener)
+	}
+	_relayListener(...params){
+		this.trigger(...params)
 	}
 	// Add an array of k.DataObjects to the end of the collection
 	addBatch(dataObjects){
+		this._inAddBatch = true
 		for(let dataObject in dataObjects){
 			if(dataObject instanceof k.DataObject == false){
 				dataObject = this.generateDataObject(dataObject)
 			}
 			this.add(dataObject)
 		}
+		this._inAddBatch = false
 	}
 	indexOf(dataObject){
 		for(var i=0; i < this.dataObjects.length; i++){
@@ -287,17 +311,42 @@ k.DataCollection = class extends k.DataObject {
 		if(index === -1){
 			return
 		}
+		this.dataObjects[index].removeListener(this._boundRelayListener)
 		this.dataObjects.splice(index, 1)
 		this.trigger("removed", this, dataObject)
 	}
 	reset(data){
+		this._inReset = true
 		for(let obj of this.dataObjects.slice()){
 			this.remove(obj)
 		}
 		for(let datum of data){
 			this.add(this.generateDataObject(datum))
 		}
+		this._inReset = false
+		if(this._comparator){
+			this.sort(this._comparator)
+		}
 		this.trigger("reset", this)
+	}
+	sort(comparator=k.DataCollection.defaultComparator){
+		this.dataObjects.sort(comparator)
+		this.trigger("sorted", this)
+	}
+	sortByAttribute(attributeName, comparator=k.defaultComparator){
+		this.sort((obj1, obj2) => {
+			return comparator(obj1.get(attributeName), obj2.get(attributeName))
+		})
+	}
+	keepSortedByField(fieldName, comparator=k.defaultComparator){
+		this._comparator = (obj1, obj2) => {
+			return comparator(obj1.get(fieldName), obj2.get(fieldName))
+		}
+		this.addListener(() => {
+			if(this._comparator && this._inReset == false && this._inAddBatch == false){
+				this.sort(this._comparator)
+			}
+		}, "changed:" + fieldName)
 	}
 	*[Symbol.iterator](){
 		for(let obj of this.dataObjects){
@@ -314,6 +363,15 @@ k.DataCollection = class extends k.DataObject {
 		}
 		return new k.DataModel(data, options)
 	}
+}
+k.DataCollection.defaultComparator = function(dataObject1, dataObject2){
+	if(dataObject1 === dataObject2) return 0
+	if(typeof dataObject1.equals === "function" && dataObject1.equals(dataObject2)) return 0
+	let val1 = dataObject1.get("id", -1)
+	let val2 = dataObject2.get("id", -1) 
+	if(val1 === val2) return 0
+	if(val1 < val2) return -1
+	return 1
 }
 
 /*
@@ -481,6 +539,16 @@ k._Route = class {
 */
 k.el = {}
 
+// This comparator that stringifies the passed values and returns the comparison of those values
+k.defaultComparator = function(el1, el2){
+	if(el1 === el2) return 0
+	let str1 = "" + el1
+	let str2 = "" + el2
+	if(str1 == str2) return 0
+	if(str1 < str2) return -1
+	return 1
+}
+
 /*
 	domElementFunction is the behind the scenes logic for the functions like k.el.div(...)
 	Below you will find the loop that uses domElementFunction
@@ -516,6 +584,28 @@ k.el.domElementFunction = function(tagName, ...params){
 			this.appendChild(child)
 		}
 		return this
+	}
+
+	/*
+	Sort el.children *in place* using the comparator function
+	See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort for an explanation of the comparator function
+	*/
+	el.sort = function(comparator=k.defaultComparator){
+		// Populate the holding array while removing children from the DOM
+		let holdingArray = [];
+		while(this.children.length > 0){
+			holdingArray.push(this.removeChild(this.children.item(0)))
+		}
+		holdingArray.sort(comparator)
+		for(let child of holdingArray){
+			this.appendChild(child);
+		}
+	}
+
+	el.sortByAttribute = function(attributeName, comparator=k.defaultComparator){
+		this.sort((el1, el2) => {
+			return comparator(el1.getAttribute(attributeName), el2.getAttribute(attributeName))
+		})
 	}
 
 	// Convenience functions to add and remove classes from this element without duplication

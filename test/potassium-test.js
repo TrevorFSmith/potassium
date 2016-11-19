@@ -243,6 +243,14 @@ kTest.testPotassium = function(){
 		receivedEvents.length = 0
 		model.trigger("changed:foo", model, "foo")
 		test.assertEqual(receivedEvents.length, 0)
+
+		let model2 = new k.DataModel({ foo:"bar" })
+		receivedEvents.length = 0
+		model2.addListener(listener, "changed:foo", true) // listen just once
+		model2.set("foo", "baz")
+		test.assertEqual(receivedEvents.length, 1)
+		model2.set("foo", "blitz")
+		test.assertEqual(receivedEvents.length, 1) // should have been removed as a listener
 	}))
 	kTest.K_TESTS.push(new kTest.Test("DataModel", (test) => {
 		class FlowersCollection extends k.DataCollection {}
@@ -358,6 +366,45 @@ kTest.testPotassium = function(){
 		test.assertEqual(receivedEvents[5].eventName, "added")
 		test.assertEqual(receivedEvents[6].eventName, "reset")
 	}))
+	kTest.K_TESTS.push(new kTest.Test("DataCollection sorting", (test) => {
+		let col1 = new k.DataCollection([
+			{ id: 4, foo:"a" },
+			{ id: 1, foo:"b" },
+			{ id: 2, foo:"c" },
+			{ id: 3, foo:"d" }
+		])
+		col1.sort() // Sorts by id
+		test.assertEqual(col1.at(0).get("id"), 1)
+		test.assertEqual(col1.at(1).get("id"), 2)
+		test.assertEqual(col1.at(2).get("id"), 3)
+		test.assertEqual(col1.at(3).get("id"), 4)
+		col1.sortByAttribute("foo")
+		test.assertEqual(col1.at(0).get("foo"), "a")
+		test.assertEqual(col1.at(1).get("foo"), "b")
+		test.assertEqual(col1.at(2).get("foo"), "c")
+		test.assertEqual(col1.at(3).get("foo"), "d")
+
+		col1.keepSortedByField("foo")
+		test.assertEqual(col1.at(0).get("foo"), "a")
+		test.assertEqual(col1.at(1).get("foo"), "b")
+		test.assertEqual(col1.at(2).get("foo"), "c")
+		test.assertEqual(col1.at(3).get("foo"), "d")
+		col1.at(0).set("foo", "z")
+		test.assertEqual(col1.at(0).get("foo"), "b")
+		test.assertEqual(col1.at(1).get("foo"), "c")
+		test.assertEqual(col1.at(2).get("foo"), "d")
+		test.assertEqual(col1.at(3).get("foo"), "z")
+		col1.reset([
+			{ id: 1, foo:"b" },
+			{ id: 2, foo:"c" },
+			{ id: 3, foo:"d" },
+			{ id: 4, foo:"a" },
+		])
+		test.assertEqual(col1.at(0).get("foo"), "a")
+		test.assertEqual(col1.at(1).get("foo"), "b")
+		test.assertEqual(col1.at(2).get("foo"), "c")
+		test.assertEqual(col1.at(3).get("foo"), "d")
+	}))	
 	kTest.K_TESTS.push(new kTest.Test("SynchronousFetch", 
 		(test) => {
 			kTest.SynchronousFetchMap.set("foo", { foo:"bar"})
@@ -416,6 +463,22 @@ kTest.testPotassium = function(){
 		test.assertEqual(el3.childNodes[0].text, "Howdy")
 		test.assertEqual(el3.getAttribute("foo"), "bar")
 		test.assertEqual(el3.children[0].innerText, "Moo")
+	}))
+	kTest.K_TESTS.push(new kTest.Test("DOM sorting", (test) => {
+		let el1 = k.el.div()
+		test.assertEqual(el1.sort(), undefined) // sort is in-place and returns nothing
+		el1.appendChild(k.el.div({ id: 3 }))
+		el1.appendChild(k.el.div({ id: 5 }))
+		el1.appendChild(k.el.div({ id: 1 }))
+		el1.appendChild(k.el.div({ id: 2 }))
+		el1.appendChild(k.el.div({ id: 5 })) // Note, there are two fives
+		el1.appendChild(k.el.div({ id: 4 }))
+		el1.sortByAttribute("id")
+		test.assertEqual(el1.children.length, 6)
+		for(var i=0; i < el1.children.length - 1; i++){
+			test.assertEqual(el1.children.item(i).getAttribute("id"), i + 1)
+		}
+		test.assertEqual(el1.children.item(el1.children.length - 1).getAttribute("id"), 5)
 	}))
 	kTest.K_TESTS.push(new kTest.Test("Component", (test) => {
 		let component1 = new k.Component()
