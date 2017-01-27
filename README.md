@@ -4,9 +4,9 @@
 
 PotassiumES is a modern, reactive replacement for heavy weight or aging Javascript libraries for front end data modeling and user interface development. If you like React, Backbone, or Ember but don't care for all of the browser compatibility and build tool baggage that they bring with them, PotassiumES will be like a breath of fresh air.
 
-PotassiumES takes advantage of the new code patterns of EcmaScript6 to eliminate unnecessary code bulk seen in libraries that need to be work with IE 6. Classes, default and spread parameters, promises, and other aspects of ES6 make PotassiumES lightweight, fast, and encourages devs to write code that is easy to maintain.
+PotassiumES takes advantage of the new code patterns of ECMAScript6 (aka ES2015) to eliminate unnecessary code bulk seen in libraries that need to work with IE 6. Classes, default and spread parameters, promises, and other aspects of ES6 make PotassiumES lightweight, fast, and encourages devs to write code that is easy to maintain.
 
-Unlike pretty much every other reactive library, PotassiumES has no external dependencies on other libraries like jQuery or build tools like webpack. Place potassium.js into any Javascript environment and go, confident that your code won't break every time a sub-dependency that you don't even directly call is broken in npm.
+Unlike pretty much every other reactive library, PotassiumES has no external dependencies on other libraries like jQuery or build tools like webpack. Place potassium.js into any Javascript environment and go, confident that your code won't break every time a sub-dependency that you don't directly call is broken in npm.
 
 ## Installation instructions
 
