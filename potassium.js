@@ -1,4 +1,4 @@
-"use strict"
+'use strict'
 /*
 	PotassiumES is a reactive element framework.
 	It handles server backed data: k.DataModel and k.DataCollection
@@ -32,7 +32,7 @@ k.EventListener = class {
 	}
 }
 
-k.ALL_EVENTS = Symbol("all events")
+k.ALL_EVENTS = Symbol('all events')
 
 /*
 	Mix in k.eventMixin to enable the instances to track event listeners and send them events
@@ -72,18 +72,15 @@ k.eventMixin = Base => class extends Base {
 			}
 		}
 	}
-	clearListeners(){
-		this._listeners.length = 0
-	}
 	get listeners(){
 		// Returns an array of EventListener instances
-		if(typeof this._listeners == "undefined"){
+		if(typeof this._listeners == 'undefined'){
 			this._listeners = []
 		}
 		return this._listeners
 	}
 	clearListeners(){
-		if(this._listeners){
+		if(typeof this._listeners !== 'undefined'){
 			this._listeners.length = 0
 		}
 	}
@@ -96,19 +93,26 @@ k.eventMixin = Base => class extends Base {
 k.DataObject = k.eventMixin(class {
 	constructor(options={}){
 		this.options = options
+		this._new = true // True until the first fetch returns, regardless of http status
+		this.cleanedUp = false
 	}
 	cleanup(){
+		if(this.cleanedUp) return
+		this.cleanedUp = true
 		this.clearListeners()
 	}
-
+	// Return true until a fetch (even a failed fetch) returns
+	get isNew(){
+		return this._new
+	}
 	// Return the URL (relative or full) as a string for the endpoint used by this.fetch
 	get url(){
-		throw new Error("Extending classes must implement url()")
+		throw new Error('Extending classes must implement url()')
 	}
 
-	// Clear out old data and set it to data
+	// Clear out old data and set it to data, should trigger a 'reset' event
 	reset(data={}){
-		throw new Error("Extending classes must implement reset")
+		throw new Error('Extending classes must implement reset')
 	}
 	parse(data){
 		// Extending classes can override this to parse the data received via a fetch
@@ -120,12 +124,14 @@ k.DataObject = k.eventMixin(class {
 	}
 	get fetchOptions(){
 		// Extending classes can override this to add headers, methods, etc to the fetch call
-		return {}
+		return {
+			credentials: 'same-origin'
+		}
 	}
 	fetch(){
 		// Ask the server for data for this model or collection
 		return new Promise(function(resolve, reject){
-			this.trigger("fetching", this)
+			this.trigger('fetching', this)
 			fetch(this.url, this.fetchOptions).then(response => {
 				if(response.status != 200){
 					throw 'Fetch failed with status ' + response.status
@@ -133,18 +139,65 @@ k.DataObject = k.eventMixin(class {
 				return response.json() 
 			}).then(data => {
 				data = this.parse(data)
+				this._new = false
 				this.reset(data)
-				this.trigger("fetched", this, data, null)
+				this.trigger('fetched', this, data, null)
+				resolve(this)
+			}).catch(err => {
+				this._new = false
+				this.trigger('fetched', this, null, err)
+				reject(err)
+			})
+		}.bind(this))
+	}
+	save(){
+		// Ask the server for data for this model or collection
+		return new Promise(function(resolve, reject){
+			this.trigger('saving', this)
+			let options = Object.assign({}, this.fetchOptions)
+			if(this.isNew){
+				options.method = 'post'
+			} else {
+				options.method = 'put'
+			}
+			options.body = JSON.stringify(this.data)
+			fetch(this.url, options).then(response => {
+				if(response.status != 200){
+					throw 'Save failed with status ' + response.status
+				}
+				return response.json() 
+			}).then(data => {
+				data = this.parse(data)
+				this.reset(data)
+				this._new = false
+				this.trigger('saved', this, data, null)
+				resolve(this)
+			}).catch(err => {
+				this.trigger('saved', this, null, err)
+				reject(err)
+			})
+		}.bind(this))
+	}
+	delete(){
+		return new Promise(function(resolve, reject){
+			this.trigger('deleting', this)
+			let options = Object.assign({}, this.fetchOptions)
+			options.method = 'delete'
+			fetch(this.url, options).then(response => {
+				if(response.status != 200){
+					throw 'Delete failed with status ' + response.status
+				}
+				this.trigger('deleted', this, null)
 				resolve()
 			}).catch(err => {
-				this.trigger("fetched", this, null, err)
+				this.trigger('deleted', this, err)
 				reject(err)
 			})
 		}.bind(this))
 	}
 })
 
-k._NO_CHANGE = Symbol("no change")
+k._NO_CHANGE = Symbol('no change')
 
 /*
 	DataModel holds a map of string,value pairs, sometimes fetched from or sent to a back-end server.
@@ -156,7 +209,7 @@ k._NO_CHANGE = Symbol("no change")
 k.DataModel = class extends k.DataObject {
 	constructor(data={}, options={}){
 		super(options)
-		if(typeof this.options.fieldDataObjects === "undefined"){
+		if(typeof this.options.fieldDataObjects === 'undefined'){
 			this.options.fieldDataObjects = {}
 		}
 		this.data = {}
@@ -171,7 +224,7 @@ k.DataModel = class extends k.DataObject {
 		Return values may be native types or, if mapped by options.fieldDataObjects, another k.DataObject
 	*/
 	get(fieldName, defaultValue=null){
-		if(typeof this.data[fieldName] === "undefined" || this.data[fieldName] === null || this.data[fieldName] === ""){
+		if(typeof this.data[fieldName] === 'undefined' || this.data[fieldName] === null || this.data[fieldName] === ''){
 			return defaultValue
 		}
 		return this.data[fieldName]
@@ -182,6 +235,7 @@ k.DataModel = class extends k.DataObject {
 		batch[fieldName] = value
 		return this.setBatch(batch)
 	}
+
 	/*
 		Set a group of values. The 'values' parameter should be an object that works in for(key in values) loops like a dictionary: {}
 		If a key is in options.fieldDataObjects then the value will be used to contruct a k.DataObject and that will be the saved value.
@@ -198,7 +252,7 @@ k.DataModel = class extends k.DataObject {
 			}
 		}
 		if(changed){
-			this.trigger("changed", this, changes)
+			this.trigger('changed', this, changes)
 		}
 		return changes
 	}
@@ -234,14 +288,15 @@ k.DataModel = class extends k.DataObject {
 	}
 	reset(data={}){
 		for(var key in this.data){
-			if(typeof data[key] === "undefined"){
+			if(typeof data[key] === 'undefined'){
 				this.data[key] = null
 			}
 		}
 		this.setBatch(data)
+		this.trigger('reset', this)
 	}
 	equals(obj){
-		if(obj === null || typeof obj === "undefined") return false
+		if(obj === null || typeof obj === 'undefined') return false
 		if(this === obj) return true
 		if(typeof obj !== typeof this) return false
 		if(obj.get('id') === this.get('id')) return true
@@ -276,7 +331,7 @@ k.DataCollection = class extends k.DataObject {
 	}
 	at(index){
 		if(index < 0 || index > this.dataObjects.length - 1){
-			throw new Error("Index out of range: ${index}")
+			throw new Error(`Index out of range: ${index}`)
 		}
 		return this.dataObjects[index]
 	}
@@ -288,7 +343,7 @@ k.DataCollection = class extends k.DataObject {
 			return
 		}
 		this.dataObjects.push(dataObject)
-		this.trigger("added", this, dataObject)
+		this.trigger('added', this, dataObject)
 		if(this._comparator && this._inReset == false && this._inAddBatch == false){
 			this.sort(this._comparator)
 		}
@@ -316,6 +371,14 @@ k.DataCollection = class extends k.DataObject {
 		}
 		return -1
 	}
+	firstByField(fieldName, value){
+		for(let model of this){
+			if(model.get(fieldName) === value){
+				return model
+			}
+		}
+		return null
+	}
 	remove(dataObject){
 		let index = this.indexOf(dataObject)
 		if(index === -1){
@@ -323,7 +386,7 @@ k.DataCollection = class extends k.DataObject {
 		}
 		this.dataObjects[index].removeListener(this._boundRelayListener)
 		this.dataObjects.splice(index, 1)
-		this.trigger("removed", this, dataObject)
+		this.trigger('removed', this, dataObject)
 	}
 	reset(data){
 		this._inReset = true
@@ -337,11 +400,11 @@ k.DataCollection = class extends k.DataObject {
 		if(this._comparator){
 			this.sort(this._comparator)
 		}
-		this.trigger("reset", this)
+		this.trigger('reset', this)
 	}
 	sort(comparator=k.DataCollection.defaultComparator){
 		this.dataObjects.sort(comparator)
-		this.trigger("sorted", this)
+		this.trigger('sorted', this)
 	}
 	sortByAttribute(attributeName, comparator=k.defaultComparator){
 		this.sort((obj1, obj2) => {
@@ -356,7 +419,7 @@ k.DataCollection = class extends k.DataObject {
 			if(this._comparator && this._inReset == false && this._inAddBatch == false){
 				this.sort(this._comparator)
 			}
-		}, "changed:" + fieldName)
+		}, 'changed:' + fieldName)
 	}
 	*[Symbol.iterator](){
 		for(let obj of this.dataObjects){
@@ -369,16 +432,19 @@ k.DataCollection = class extends k.DataObject {
 	generateDataObject(data){
 		let options = { collection: this }
 		if(this.options.dataObject){
-			return new this.options.dataObject(data, options)
+			var dataObj = new this.options.dataObject(data, options)
+		} else {
+			var dataObj = new k.DataModel(data, options)
 		}
-		return new k.DataModel(data, options)
+		dataObj._new = false
+		return dataObj
 	}
 }
 k.DataCollection.defaultComparator = function(dataObject1, dataObject2){
 	if(dataObject1 === dataObject2) return 0
-	if(typeof dataObject1.equals === "function" && dataObject1.equals(dataObject2)) return 0
-	let val1 = dataObject1.get("id", -1)
-	let val2 = dataObject2.get("id", -1) 
+	if(typeof dataObject1.equals === 'function' && dataObject1.equals(dataObject2)) return 0
+	let val1 = dataObject1.get('id', -1)
+	let val2 = dataObject2.get('id', -1) 
 	if(val1 === val2) return 0
 	if(val1 < val2) return -1
 	return 1
@@ -391,7 +457,8 @@ k.Component = k.eventMixin(class {
 	constructor(dataObject=null, options={}){
 		this.dataObject = dataObject // a k.DataModel or k.DataCollection
 		this.options = options
-		if(typeof this.options.el !== "undefined"){
+		this.cleanedUp = false
+		if(typeof this.options.el !== 'undefined'){
 			this.el = this.options.el
 		} else {
 			this.el = k.el.div()
@@ -401,6 +468,8 @@ k.Component = k.eventMixin(class {
 		this._el.component = this
 	}
 	cleanup(){
+		if(this.cleanedUp) return
+		this.cleanedUp = true
 		this.clearListeners()
 		for(let bindInfo of this.boundCallbacks){
 			bindInfo.dataObject.removeListener(bindInfo.callback)
@@ -418,7 +487,7 @@ k.Component = k.eventMixin(class {
 			throw new Error(`Tried to set a non-DOM element to Component.el: ${domElement}: ${domElement.nodeType}`)
 		}
 		if(this._el){
-			delete this._el["component"]
+			delete this._el['component']
 		}
 		this._el = domElement
 		this._el.component = this
@@ -428,7 +497,7 @@ k.Component = k.eventMixin(class {
 		Listen to a DOM event.
 		For example:
 			this.buttonEl = k.el.button()
-			this.listenTo("click", this.buttonEl, this.handleClick)
+			this.listenTo('click', this.buttonEl, this.handleClick)
 	*/
 	listenTo(eventName, targetEl, callback, context=this){
 		let boundCallback = context === null ? callback : callback.bind(context)
@@ -450,14 +519,14 @@ k.Component = k.eventMixin(class {
 	bindText(fieldName, targetElement, formatter=null, dataObject=this.dataObject){
 		if(formatter === null){
 			formatter = (value) => {
-				if(value === null) return ""
-				if(typeof value === "string") return value
-				return "" + value
+				if(value === null) return ''
+				if(typeof value === 'string') return value
+				return '' + value
 			}
 		}
 		let callback = () => {
 			let result = formatter(dataObject.get(fieldName))
-			targetElement.innerText = typeof result === "string" ? result : ""
+			targetElement.innerText = typeof result === 'string' ? result : ''
 		}
 		dataObject.addListener(callback, `changed:${fieldName}`)
 		callback()
@@ -473,9 +542,9 @@ k.Component = k.eventMixin(class {
 	bindAttribute(fieldName, targetElement, attributeName, formatter=null, dataObject=this.dataObject){
 		if(formatter === null){
 			formatter = (value) => {
-				if(value === null) return ""
-				if(typeof value === "string") return value
-				return "" + value
+				if(value === null) return ''
+				if(typeof value === 'string') return value
+				return '' + value
 			}
 		}
 		let callback = () => {
@@ -489,7 +558,7 @@ k.Component = k.eventMixin(class {
 		})
 	}
 })
-k.Component.ElementChangeEvent = "element-changed"
+k.Component.ElementChangeEvent = 'element-changed'
 
 /*
 	Router maps window.history events and URL path fragments to events
@@ -497,12 +566,16 @@ k.Component.ElementChangeEvent = "element-changed"
 */
 k.Router = k.eventMixin(class {
 	constructor(){
+		this.cleanedUp = false
 		this.routes = [];
 		this.hashListener = this._checkHash.bind(this)
         window.addEventListener('hashchange', this.hashListener, false)
 	}
 	cleanup(){
+		if(this.cleanedUp) return
+		this.cleanedUp = true
 		window.removeEventListener('hashchange', this.hashListener)
+		this.clearListeners()
 	}
 	addRoute(regex, eventName, ...parameters){
 		this.routes.push(new k._Route(regex, eventName, ...parameters))
@@ -525,9 +598,9 @@ k.Router = k.eventMixin(class {
 		this.trigger(k.Router.UnknownRouteEvent, path)
 	}
 })
-k.Router.RouteAddedEvent = "route-added"
-k.Router.StartedRoutingEvent = "started-routing"
-k.Router.UnknownRouteEvent = "unknown-route"
+k.Router.RouteAddedEvent = 'route-added'
+k.Router.StartedRoutingEvent = 'started-routing'
+k.Router.UnknownRouteEvent = 'unknown-route'
 
 /*
 	_Route tracks routes for k.Router
@@ -552,11 +625,25 @@ k.el = {}
 // This comparator that stringifies the passed values and returns the comparison of those values
 k.defaultComparator = function(el1, el2){
 	if(el1 === el2) return 0
-	let str1 = "" + el1
-	let str2 = "" + el2
+	let str1 = '' + el1
+	let str2 = '' + el2
 	if(str1 == str2) return 0
 	if(str1 < str2) return -1
 	return 1
+}
+
+k.documentOffset = function(el){
+	let left = 0
+	let top = 0
+	var findPos = function(obj) {
+		left += obj.offsetLeft
+		top += obj.offsetTop
+		if(obj.offsetParent){
+			findPos(obj.offsetParent)
+		}
+	}
+	findPos(el)
+	return [left, top]
 }
 
 /*
@@ -573,17 +660,24 @@ k.el.domElementFunction = function(tagName, ...params){
 		return this
 	}
 
+	el.remove = function(){
+		if(this.parentElement){
+			this.parentElement.removeChild(this)
+		}
+		return this
+	}
+
 	// A convenience function to allow appending strings, dictionaries of attributes, arrays of subchildren, or children
 	el.append = function(child=null){
 		if(child === null){ return }
-		if(typeof child === "string"){
+		if(typeof child === 'string'){
 			this.appendChild(document.createTextNode(child))
 		} else if(Array.isArray(child)){
 			for(let subChild of child){
 				this.append(subChild)
 			}
 		// If it's an object but not a DOM element, consider it a dictionary of attributes
-		} else if(typeof child === "object" && typeof child.nodeType === "undefined"){
+		} else if(typeof child === 'object' && typeof child.nodeType === 'undefined'){
 			for(let key in child){
 				if(child.hasOwnProperty(key) == false){
 					continue
@@ -594,6 +688,10 @@ k.el.domElementFunction = function(tagName, ...params){
 			this.appendChild(child)
 		}
 		return this
+	}
+
+	el.documentPosition = function(){
+		return k.documentOffset(this)
 	}
 
 	/*
@@ -610,27 +708,29 @@ k.el.domElementFunction = function(tagName, ...params){
 		for(let child of holdingArray){
 			this.appendChild(child);
 		}
+		return this
 	}
 
 	el.sortByAttribute = function(attributeName, comparator=k.defaultComparator){
 		this.sort((el1, el2) => {
 			return comparator(el1.getAttribute(attributeName), el2.getAttribute(attributeName))
 		})
+		return this
 	}
 
 	// Convenience functions to add and remove classes from this element without duplication
 	el.addClass = function(className){
-		const classAttribute = this.getAttribute("class") || ""
+		const classAttribute = this.getAttribute('class') || ''
 		const classes = classAttribute.split(/\s+/)
 		if(classes.indexOf(className) != -1){
 			// Already has that class
 			return this
 		}
-		this.setAttribute("class", (classAttribute + " " + className).trim())
+		this.setAttribute('class', (classAttribute + ' ' + className).trim())
 		return this
 	}
 	el.removeClass = function(className){
-		let classAttribute = this.getAttribute("class") || ""
+		let classAttribute = this.getAttribute('class') || ''
 		const classes = classAttribute.split(/\s+/)
 		const index = classes.indexOf(className)
 		if(index == -1){
@@ -638,11 +738,11 @@ k.el.domElementFunction = function(tagName, ...params){
 			return this
 		}
 		classes.splice(index, 1)
-		classAttribute = classes.join(" ").trim()
+		classAttribute = classes.join(' ').trim()
 		if(classAttribute.length == 0){
-			this.removeAttribute("class")
+			this.removeAttribute('class')
 		} else {
-			this.setAttribute("class", classes.join(" ").trim())
+			this.setAttribute('class', classes.join(' ').trim())
 		}
 		return this
 	}
@@ -680,3 +780,4 @@ for(let tag of k.el.TAGS){
 		return k.el.domElementFunction(innerTag, ...params)
 	}
 }
+

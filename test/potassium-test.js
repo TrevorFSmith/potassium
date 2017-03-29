@@ -466,7 +466,7 @@ kTest.testPotassium = function(){
 	}))
 	kTest.K_TESTS.push(new kTest.Test("DOM sorting", (test) => {
 		let el1 = k.el.div()
-		test.assertEqual(el1.sort(), undefined) // sort is in-place and returns nothing
+		test.assertEqual(el1.sort(), el1) // sort is in-place and returns the element for chaining
 		el1.appendChild(k.el.div({ id: 3 }))
 		el1.appendChild(k.el.div({ id: 5 }))
 		el1.appendChild(k.el.div({ id: 1 }))
