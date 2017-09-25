@@ -6,15 +6,21 @@ PotassiumES is a modern, reactive replacement for heavy weight or aging Javascri
 
 PotassiumES takes advantage of the new code patterns of ECMAScript6 (aka ES2015) to eliminate unnecessary code bulk seen in libraries that need to work with IE 6. Classes, default and spread parameters, promises, and other aspects of ES6 make PotassiumES lightweight, fast, and encourages devs to write code that is easy to maintain.
 
-Unlike pretty much every other reactive library, PotassiumES has no external dependencies on other libraries like jQuery or build tools like webpack. Place potassium.js into any Javascript environment and go, confident that your code won't break every time a sub-dependency that you don't directly call is broken in npm.
+Unlike pretty much every other reactive library, PotassiumES has no external dependencies on other libraries like jQuery. Place `dist/potassium.js` into any Javascript environment and go, confident that your code won't break every time a sub-dependency breaks.
 
 ## Installation instructions
 
-Copy potassium.js to your document root and include this in your head element:
+Copy `dist/potassium.js` to your document root and include this in your head element:
 
 	<script src="potassium.js"></script>
 
 (yes, that's really all it takes)
+
+If you're using ES6 modules in your project (so fancy!) the `potassium` directory contains the class sources.
+
+If you make changes and want to rebuild `dist/potassium.js`, run `npm install` and then `npm run build`.
+
+You can also `npm run start` to run a local httpd to try the examples and run the tests.
 
 ## Code examples
 

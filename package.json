@@ -1,0 +1,32 @@
+{
+  "name": "potassium",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "start": "npm run build && http-server .",
+    "build": "webpack"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TrevorFSmith/potassium.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TrevorFSmith/potassium/issues"
+  },
+  "homepage": "https://github.com/TrevorFSmith/potassium#readme",
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-loader": "^7.1.1",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-preset-env": "^1.6.0",
+    "http-server": "^0.10.0",
+    "webpack": "^3.5.5"
+  }
+}
