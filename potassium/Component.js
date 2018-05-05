@@ -1,8 +1,11 @@
-import EventMixin from './EventMixin.js'
 import el from './El.js'
+import graph from './Graph.js'
+import EventMixin from './EventMixin.js'
 
-/*
-	Component holds the reactive logic for a DOM element
+/**
+	Component contains the reactive logic for a responsive UI element.
+	It supports all three display modes: flat, portal, and immersive.
+	It reacts to DOM events as well as Actions
 */
 let Component = EventMixin(
 	class {
@@ -10,15 +13,24 @@ let Component = EventMixin(
 			this.dataObject = dataObject // a DataModel or DataCollection
 			this.options = options
 			this.cleanedUp = false
-			if(typeof this.options.el !== 'undefined'){
-				this.el = this.options.el
-			} else {
-				this.el = el.div()
-			}
+
+			// Set up the DOM and 3D graph for the three display modes:
+
+			// Flat display mode elements, including page type controls
+			this._flatEl = this.options.flatEl || el.div()
+
+			// Portal display mode overlay controls
+			this._portalEl = this.options.overlayEl || el.div()
+			// Portal display mode 3D graph
+			this._portalGraph = this.options.portalGraph || graph.group()
+
+			// Immersive display mode 3D graph
+			this._immersiveGraph = this.options.immersiveGraph || graph.group()
+
 			this.boundCallbacks = [] // { callback, dataObject } to be unbound during cleanup
 			this.domEventCallbacks = [] // { callback, eventName, targetEl } to be unregistered during cleanup
-			this._el.component = this
 		}
+
 		cleanup(){
 			if(this.cleanedUp) return
 			this.cleanedUp = true
@@ -30,28 +42,19 @@ let Component = EventMixin(
 				domInfo.targetEl.removeEventListener(domInfo.eventName, domInfo.callback)
 			}
 		}
-		// The root DOM element
-		get el(){ 
-			return this._el
-		}
-		set el(domElement){
-			if(!domElement || domElement.nodeType !== 1){
-				throw new Error(`Tried to set a non-DOM element to Component.el: ${domElement}: ${domElement.nodeType}`)
-			}
-			if(this._el){
-				delete this._el['component']
-			}
-			this._el = domElement
-			this._el.component = this
-			this.trigger(Component.ElementChangedEvent, this, this._el)
-		}
+
+		get flatEl(){ return this._flatEl }
+		get portalEl(){ return this._portalEl }
+		get portalGraph() { return this._portalGraph }
+		get immersiveGraph(){ return this._immersiveGraph }
+
 		/*
 			Listen to a DOM event.
 			For example:
 				this.buttonEl = el.button()
-				this.listenTo('click', this.buttonEl, this.handleClick)
+				this.listenToEl('click', this.buttonEl, this.handleClick)
 		*/
-		listenTo(eventName, targetEl, callback, context=this){
+		listenToEl(eventName, targetEl, callback, context=this){
 			let boundCallback = context === null ? callback : callback.bind(context)
 			let info = {
 				eventName: eventName,
@@ -68,7 +71,7 @@ let Component = EventMixin(
 			dataObject defaults to this.dataObject but can be any DataModel or DataCollection
 			formatter defaults to the identity function but can be any function that accepts the value and returns a string
 		*/
-		bindText(fieldName, targetElement, formatter=null, dataObject=this.dataObject){
+		bindTextEl(fieldName, targetElement, formatter=null, dataObject=this.dataObject){
 			if(formatter === null){
 				formatter = (value) => {
 					if(value === null) return ''
@@ -91,7 +94,7 @@ let Component = EventMixin(
 			Set the attributeName attribute of targetElement to the value of dataObject.get(fieldName) as it changes
 			formatter defaults to the identity function but can be any function that accepts the value and returns a string
 		*/
-		bindAttribute(fieldName, targetElement, attributeName, formatter=null, dataObject=this.dataObject){
+		bindAttributeEl(fieldName, targetElement, attributeName, formatter=null, dataObject=this.dataObject){
 			if(formatter === null){
 				formatter = (value) => {
 					if(value === null) return ''
@@ -111,8 +114,6 @@ let Component = EventMixin(
 		}
 	}
 )
-
-Component.ElementChangeEvent = 'element-changed'
 
 export default Component
 

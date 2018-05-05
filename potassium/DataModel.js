@@ -14,6 +14,7 @@ export default class extends DataObject {
 			this.options.fieldDataObjects = {}
 		}
 		this.data = {}
+		this.collection = null // set or unset by a DataCollection that claims or releases the model
 		this.setBatch(data)
 	}
 	cleanup() {
@@ -89,6 +90,18 @@ export default class extends DataObject {
 			}
 		}
 		return this.data[fieldName]
+	}
+	delete(){
+		return new Promise((resolve, reject) => {
+			super.delete().then((...params) => {
+				if(this.collection !== null){
+					this.collection.remove(this)
+				}
+				resolve(...params)
+			}).catch((...params) => {
+				reject(...params)
+			})
+		})
 	}
 	reset(data={}){
 		for(var key in this.data){

@@ -57,7 +57,7 @@ let DataObject = EventMixin(
 			// Ask the server for data for this model or collection
 			return new Promise(function(resolve, reject){
 				this.trigger('fetching', this)
-				fetch(this.url, this.fetchOptions).then(response => {
+				this._innerFetch(this.url, this.fetchOptions).then(response => {
 					if(response.status != 200){
 						throw 'Fetch failed with status ' + response.status
 					}
@@ -75,6 +75,39 @@ let DataObject = EventMixin(
 				})
 			}.bind(this))
 		}
+		/*
+		This can be used to override the use of window.fetch
+		For example, MockService overrides this to intercept fetch calls and return its own responses for matched endpoints
+		*/
+		_innerFetch(...params){
+			return fetch(...params)
+		}
+
+		/*
+		Fetch each DataObject and then wait for them all to return
+		Note: this resolves when the fetches complete, regardless of whether they succeed or fail.
+		*/
+		static fetchAll(...dataObjects){
+			let allAreFetched = () => {
+				for(let dataObject of dataObjects){
+					if(dataObject.isNew) return false
+				}
+				return true
+			}
+			return new Promise((resolve, reject) => {
+				if(allAreFetched()){
+					resolve(...dataObjects)
+					return
+				}
+				for(let dataObject of dataObjects){
+					dataObject.fetch().then(() => {
+						if(allAreFetched()) resolve(...dataObjects)
+					}).catch(err => {
+						if(allAreFetched()) resolve(...dataObjects)
+					})
+				}
+			})
+		}
 		save(){
 			// Tell the server to create (POST) or update (PUT) this model or collection
 			return new Promise(function(resolve, reject){
@@ -86,7 +119,7 @@ let DataObject = EventMixin(
 					options.method = 'put'
 				}
 				options.body = JSON.stringify(this.data)
-				fetch(this.url, options).then(response => {
+				this._innerFetch(this.url, options).then(response => {
 					if(response.status != 200){
 						throw 'Save failed with status ' + response.status
 					}
@@ -108,7 +141,7 @@ let DataObject = EventMixin(
 				this.trigger('deleting', this)
 				let options = Object.assign({}, this.fetchOptions)
 				options.method = 'delete'
-				fetch(this.url, options).then(response => {
+				this._innerFetch(this.url, options).then(response => {
 					if(response.status != 200){
 						throw 'Delete failed with status ' + response.status
 					}

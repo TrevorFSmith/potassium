@@ -38,7 +38,7 @@ let DataCollection = class extends DataObject {
 			let fetchOptions = Object.assign(options, this.fetchOptions)
 			fetchOptions.method = 'post'
 			fetchOptions.body = JSON.stringify(data)
-			fetch(this.url, fetchOptions).then(response => {
+			this._innerFetch(this.url, fetchOptions).then(response => {
 				if(response.status != 200){
 					throw 'Create failed with status ' + response.status
 				}
