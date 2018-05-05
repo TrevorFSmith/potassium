@@ -7,7 +7,7 @@ DefaultItemComponent is used by CollectionComponent if no itemComponent option i
 */
 let DefaultItemComponent = class extends Component {
 	constructor(dataObject=null, options={}){
-		super(dataObject, Object.assign({ el: el.li() }, options))
+		super(dataObject, Object.assign({ flatEl: el.li() }, options))
 		if(dataObject === null) throw 'DefaultItemComponent requires a dataObject'
 		this.flatEl.appendChild(el.span('Item: ' + dataObject))
 	}
