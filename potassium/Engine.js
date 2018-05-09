@@ -16,6 +16,7 @@ let Engine = class {
 		this._el.addClass(this._mode + '-engine')
 		this._scene = scene
 		this._camera = camera
+		this._camera.name = mode + '-camera'
 		this._scene.add(this._camera)
 
 		this._glCanvas = el.canvas().appendTo(this._el)

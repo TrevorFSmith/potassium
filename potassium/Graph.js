@@ -52,6 +52,52 @@ graph.nodeFunction = function(clazz, ...params){
 
 graph.engine = (scene, camera, mode) => { return new Engine(scene, camera, mode) }
 
+graph.fonts = new Map() // url => THREE.Font
+
+function loadText(resultGroup, text, material, font, options){
+	if(graph.fonts.has(font)){
+		const textGeometry = new THREE.TextGeometry(text, Object.assign({ font: graph.fonts.get(font) }, options))
+		resultGroup.add(new THREE.Mesh(textGeometry, material));
+	} else {
+		let fontLoader = new THREE.FontLoader()
+		fontLoader.load(font, loadedFont => {
+			graph.fonts.set(font, loadedFont)
+			const textGeometry = new THREE.TextGeometry(text, Object.assign({ font: loadedFont }, options))
+			resultGroup.add(new THREE.Mesh(textGeometry, material));
+		}, () => {}, err => {
+			console.error('Could not load font', font, err)
+		})
+	}
+}
+
+graph.text = (text='', material=null, fontPath=null, options={}) => {
+	const font = fontPath ||'./js/potassium/fonts/helvetiker_regular.typeface.json'
+	options = Object.assign({
+		size: 0.25,
+		height: 0.05,
+		curveSegments: 4,
+		bevelEnabled: false,
+		bevelThickness: 1,
+		bevelSize: 0.8,
+		bevelSegments: 5
+	}, options || {})
+
+	material = material || new THREE.MeshBasicMaterial( { color: 0x444444 } );
+
+	let resultGroup = new THREE.Group()
+	resultGroup.name = "text"
+
+	loadText(resultGroup, text, material, font, options)
+
+	resultGroup.setText = (newText) => {
+		while(resultGroup.children.length > 0){
+			resultGroup.remove(resultGroup.children[0])
+		}
+		loadText(resultGroup, newText, material, font, options)
+	}
+	return resultGroup
+}
+
 graph.obj = (path) => {
 	let geometry = path.split('/')[path.split('/').length - 1]
 	let baseURL = path.substring(0, path.length - geometry.length)
@@ -74,8 +120,11 @@ graph.gltf = (path) => {
 	return group
 }
 
+graph.meshBasicMaterial = (options) => { return new THREE.MeshBasicMaterial(options) }
+
 graph.GRAPH_CLASSES = [
 	{ class: 'Scene', name: 'scene' },
+	{ class: 'Group', name: 'group' },
 	{ class: 'Group', name: 'group' },
 	{ class: 'AmbientLight', name: 'ambientLight' },
 	{ class: 'PerspectiveCamera', name: 'perspectiveCamera' }
@@ -86,6 +135,17 @@ for(let graphClassInfo of graph.GRAPH_CLASSES){
 	let innerClazz = graphClassInfo.class
 	graph[graphClassInfo.name] = function(...params){
 		return graph.nodeFunction(innerClazz, ...params)
+	}
+}
+
+THREE.Object3D.prototype.prettyPrint = function(depth=0){
+	let tabs = ''
+	for(let i=0; i < depth; i++){
+		tabs += '  '
+	}
+	console.log(tabs, this.name || '-', this.position.x, this.position.y, this.position.z)
+	for(let i=0; i < this.children.length; i++){
+		this.children[i].prettyPrint(depth + 1)
 	}
 }
 

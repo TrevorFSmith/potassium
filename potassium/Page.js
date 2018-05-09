@@ -28,17 +28,28 @@ let Page = EventMixin(
 
 			/** Portal display mode overlay DOM and 3D scene */
 			this._portalEl = el.div({ class: 'portal-root' }).appendTo(this._el)
-			this._portalScene = graph.scene()					
-			this._portalCamera = graph.perspectiveCamera([45, 1, 0.5, 10000]).appendTo(this._portalScene)
+			this._portalScene = graph.scene()
+			this._portalCamera = graph.perspectiveCamera([45, 1, 0.5, 10000])
 			this._portalEngine = graph.engine(this._portalScene, this._portalCamera, Engine.PORTAL)
-			//this._portalEl.appendChild(this._portalEngine.el)
 
 			/** Immersive display mode 3D scene */
 			this._immersiveEl = el.div({ class: 'immersive-root' }).appendTo(this._el)
 			this._immersiveScene = graph.scene()					
-			this._immersiveCamera = graph.perspectiveCamera([45, 1, 0.5, 10000]).appendTo(this._immersiveScene)
+			this._immersiveCamera = graph.perspectiveCamera([45, 1, 0.5, 10000])
 			this._immersiveEngine = graph.engine(this._immersiveScene, this._immersiveCamera, Engine.IMMERSIVE)
-			this._immersiveEl.appendChild(this._immersiveEngine.el)
+
+			// When the mode changes, notify all of the children Components
+			this.addListener((eventName, mode) => {
+				const dive = (node) => {
+					if(typeof node.component !== 'undefined' && typeof node.component.handleDisplayModeChange === 'function'){
+						node.component.handleDisplayModeChange(mode)
+					}
+					for(let i=0; i < node.children.length; i++){
+						dive(node.children[i])
+					}
+				}
+				dive(this._flatEl)
+			}, Page.DisplayModeChangedEvent)
 
 			this._updateClasses()
 		}
@@ -48,6 +59,25 @@ let Page = EventMixin(
 		get flatEl(){ return this._flatEl }
 		get portalScene(){ return this._portalScene }
 		get immersiveScene(){ return this._immersiveScene }
+
+		/*
+		appendComponent adds the childComponent's flatEl, portalEl, portalGraph, and immersiveGraph to this Component's equivalent attributes.
+		*/
+		appendComponent(childComponent){
+			this._flatEl.appendChild(childComponent.flatEl)
+			this._portalEl.appendChild(childComponent.portalEl)
+			this._portalScene.add(childComponent.portalGraph)
+			this._immersiveScene.add(childComponent.immersiveGraph)
+		}
+		/*
+		removeComponent removes the childComponent's flatEl, portalEl, portalGraph, and immersiveGraph from this Component's equivalent attributes.
+		*/
+		removeComponent(childComponent){
+			this._flatEl.removeChild(childComponent.flatEl)
+			this._portalEl.removeChild(childComponent.portalEl)
+			this._portalScene.remove(childComponent.portalGraph)
+			this._immersiveScene.remove(childComponent.immersiveGraph)
+		}
 
 		get displayMode(){ return this._displayMode }
 		setDisplayMode(value){
@@ -60,7 +90,7 @@ let Page = EventMixin(
 					this._immersiveEngine.stop()
 					this._displayMode = Page.FLAT
 					this._updateClasses()
-					this.trigger(Page.ModeChangedEvent, Page.FLAT)
+					this.trigger(Page.DisplayModeChangedEvent, Page.FLAT)
 				})
 			}
 			if(value === Page.PORTAL){
@@ -69,7 +99,7 @@ let Page = EventMixin(
 					this._portalEngine.start().then(() => {
 						this._displayMode = Page.PORTAL
 						this._updateClasses()
-						this.trigger(Page.ModeChangedEvent, Page.PORTAL)
+						this.trigger(Page.DisplayModeChangedEvent, Page.PORTAL)
 						resolve(Page.PORTAL)
 					}).catch(err => {
 						console.error('Error starting portal engine', err)

@@ -18,14 +18,18 @@ let Component = EventMixin(
 
 			// Flat display mode elements, including page type controls
 			this._flatEl = this.options.flatEl || el.div()
+			this._flatEl.component = this
 
 			// Portal display mode overlay controls
-			this._portalEl = this.options.overlayEl || el.div()
+			this._portalEl = this.options.portalEl || el.div()
+			this._portalEl.component = this
 			// Portal display mode 3D graph
 			this._portalGraph = this.options.portalGraph || graph.group()
+			this._portalGraph.component = this
 
 			// Immersive display mode 3D graph
 			this._immersiveGraph = this.options.immersiveGraph || graph.group()
+			this._immersiveGraph.component = this
 
 			this.boundCallbacks = [] // { callback, dataObject } to be unbound during cleanup
 			this.domEventCallbacks = [] // { callback, eventName, targetEl } to be unregistered during cleanup
@@ -43,10 +47,44 @@ let Component = EventMixin(
 			}
 		}
 
+		/* 
+		Called when a Page parent changes display mode: Page.FLAT, Page.PORTAL, or Page.IMMERSIVE
+		*/
+		handleDisplayModeChange(mode){}
+
 		get flatEl(){ return this._flatEl }
 		get portalEl(){ return this._portalEl }
 		get portalGraph() { return this._portalGraph }
 		get immersiveGraph(){ return this._immersiveGraph }
+
+		/*
+		appendComponent adds the childComponent's flatEl, portalEl, portalGraph, and immersiveGraph to this Component's equivalent attributes.
+		*/
+		appendComponent(childComponent){
+			this._flatEl.appendChild(childComponent.flatEl)
+			this._portalEl.appendChild(childComponent.portalEl)
+			this._portalGraph.add(childComponent.portalGraph)
+			this._immersiveGraph.add(childComponent.immersiveGraph)
+		}
+		/*
+		removeComponent removes the childComponent's flatEl, portalEl, portalGraph, and immersiveGraph from this Component's equivalent attributes.
+		*/
+		removeComponent(childComponent){
+			this._flatEl.removeChild(childComponent.flatEl)
+			this._portalEl.removeChild(childComponent.portalEl)
+			this._portalGraph.remove(childComponent.portalGraph)
+			this._immersiveGraph.remove(childComponent.immersiveGraph)
+		}
+
+		// Helper functions to add and remove class attributes to both flat and portal DOM elements
+		addClass(className){
+			this._flatEl.addClass(className)
+			this._portalEl.addClass(className)
+		}
+		removeClass(className){
+			this._flatEl.removeClass(className)
+			this._portalEl.removeClass(className)
+		}
 
 		/*
 			Listen to a DOM event.
