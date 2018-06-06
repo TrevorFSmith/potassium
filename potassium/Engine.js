@@ -6,12 +6,13 @@ import XRCoordinateSystem from '../webxr-polyfill/XRCoordinateSystem.js'
 Engine wraps up the THREE.Renderer and manages moving into and out of XRSessions
 */
 let Engine = class {
-	constructor(scene, camera, mode){
+	constructor(scene, camera, mode, tickCallback=null){
 		if(Engine.MODES.indexOf(mode) === -1){
 			throw new Error('Unknown engine mode', mode)
 		}
 		this._render = this._render.bind(this)
 		this._mode = mode
+		this._tickCallback = tickCallback
 		this._el = el.div({ class: 'engine' }) // This will contain the rendering canvas
 		this._el.addClass(this._mode + '-engine')
 		this._scene = scene
@@ -108,6 +109,9 @@ let Engine = class {
 	_render(frame){
 		if(this._session === null){
 			return
+		}
+		if(this._tickCallback){
+			this._tickCallback()
 		}
 		this._session.requestFrame(this._render)
 		if(typeof frame === 'number') return // This happens when switching from window.requestAnimationFrame to session.requestFrame

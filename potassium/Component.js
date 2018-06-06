@@ -16,7 +16,7 @@ let Component = EventMixin(
 
 			// Set up the DOM and 3D graph for the three display modes:
 
-			// Flat display mode elements, including page type controls
+			// Flat display mode elements, including app type controls
 			this._flatEl = this.options.flatEl || el.div()
 			this._flatEl.component = this
 
@@ -48,7 +48,7 @@ let Component = EventMixin(
 		}
 
 		/* 
-		Called when a Page parent changes display mode: Page.FLAT, Page.PORTAL, or Page.IMMERSIVE
+		Called when a App parent changes display mode: App.FLAT, App.PORTAL, or App.IMMERSIVE
 		*/
 		handleDisplayModeChange(mode){}
 

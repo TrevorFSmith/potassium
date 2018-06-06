@@ -50,7 +50,7 @@ graph.nodeFunction = function(clazz, ...params){
 	return instance
 }
 
-graph.engine = (scene, camera, mode) => { return new Engine(scene, camera, mode) }
+graph.engine = (scene, camera, mode, tickCallback) => { return new Engine(scene, camera, mode, tickCallback) }
 
 graph.fonts = new Map() // url => THREE.Font
 
@@ -87,13 +87,15 @@ graph.text = (text='', material=null, fontPath=null, options={}) => {
 	let resultGroup = new THREE.Group()
 	resultGroup.name = "text"
 
-	loadText(resultGroup, text, material, font, options)
+	let textGroup = new THREE.Group()
+	resultGroup.add(textGroup)
+	loadText(textGroup, text, material, font, options)
 
 	resultGroup.setText = (newText) => {
-		while(resultGroup.children.length > 0){
-			resultGroup.remove(resultGroup.children[0])
-		}
-		loadText(resultGroup, newText, material, font, options)
+		resultGroup.remove(...resultGroup.children)
+		let textGroup = new THREE.Group()
+		resultGroup.add(textGroup)
+		loadText(textGroup, newText, material, font, options)
 	}
 	return resultGroup
 }

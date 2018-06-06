@@ -10,6 +10,8 @@ let DefaultItemComponent = class extends Component {
 		super(dataObject, Object.assign({ flatEl: el.li() }, options))
 		if(dataObject === null) throw 'DefaultItemComponent requires a dataObject'
 		this.flatEl.appendChild(el.span('Item: ' + dataObject))
+		this.portalGraph.appendChild(graph.text('Item: ' + dataObject))
+		this.immersiveGraph.appendChild(graph.text('Item: ' + dataObject))
 	}
 }
 
@@ -22,7 +24,9 @@ Options:
 */
 let CollectionComponent = class extends Component {
 	constructor(dataObject=null, options={}){
-		super(dataObject, options)
+		super(dataObject, Object.assign({
+			itemGraphHeight: 0.3
+		}, options))
 		this.flatEl.addClass('collection-component')
 		if(dataObject instanceof DataCollection === false) throw 'CollectionComponent requires a DataCollection dataObject'
 		this._inGroupChange = false // True while resetting or other group change
@@ -49,10 +53,22 @@ let CollectionComponent = class extends Component {
 		// filterFn must accept a DataModel and return a boolean indicating whether its Component.flatEl.style.display should be set to '' or 'none'
 		for(let [i, itemComponent] of this._dataObjectComponents){
 			if(typeof filterFn === 'function'){
-				itemComponent.flatEl.style.display = filterFn(itemComponent.dataObject) ? '' : 'none'
+				var display = filterFn(itemComponent.dataObject)
 			} else {
-				itemComponent.flatEl.style.display = ''
+				var display = true
 			}
+			itemComponent.flatEl.style.display = display ? '' : 'none'
+			itemComponent.portalGraph.visible = display
+			itemComponent.immersiveGraph.visible = display
+		}
+		this._layoutGraph()
+	}
+	_layoutGraph(){
+		let y = 0
+		for(let [id, component] of this._dataObjectComponents){
+			if(component.visible === false) continue
+			component.portalGraph.position.set(component.portalGraph.position.x, y, component.portalGraph.position.z)
+			y -= this.options.itemGraphHeight
 		}
 	}
 	_handleCollectionAdded(eventName, collection, dataObject){
@@ -76,6 +92,7 @@ let CollectionComponent = class extends Component {
 			this._add(this._createItemComponent(dataObject))
 		}
 		this._inGroupChange = false
+		this._layoutGraph()
 		this.trigger(CollectionComponent.Reset, this)
 	}
 	_handleItemClick(ev, itemComponent){
@@ -90,17 +107,28 @@ let CollectionComponent = class extends Component {
 			return
 		}
 		this._dataObjectComponents.set(itemComponent.dataObject.get('id'), itemComponent)
+
 		this._ul.appendChild(itemComponent.flatEl)
 		if(this.options.onClick){
 			itemComponent.flatEl.addEventListener('click', (ev) => { this._handleItemClick(ev, itemComponent) })
 		}
+
+		this.portalGraph.add(itemComponent.portalGraph)
+		this.immersiveGraph.add(itemComponent.immersiveGraph)
+
+		if(this._inGroupChange === false) this._layoutGraph()
+
 		itemComponent.dataObject.addListener(this._handleDeleted.bind(this), 'deleted', true)
 	}
 	_remove(itemComponent){
 		this._dataObjectComponents.delete(itemComponent.dataObject.get('id'))
 		this._ul.removeChild(itemComponent.flatEl)
+		this.portalGraph.remove(itemComponent.portalGraph)
+		this.immersiveGraph.remove(itemComponent.immersiveGraph)
 		itemComponent.flatEl.removeEventListener('click', null)
 		itemComponent.cleanup()
+
+		if(this._inGroupChange === false) this._layoutGraph()
 	}
 	_handleDeleted(eventName, dataObject, error){
 		if(error) return
