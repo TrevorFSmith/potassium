@@ -8,10 +8,9 @@ let graph = {}
 export default graph
 
 /*
-	if the first parameter in params is an array, the values of the array will be passed into the constructor of the instance
+	if the first elements in `params` is an array, the values of the array will be passed as separate parameters into the constructor of the instance
 */
 graph.nodeFunction = function(clazz, ...params){
-
 	let instance = null
 	let consumedFirstParam = false
 	if(Array.isArray(params[0])){
@@ -82,7 +81,7 @@ graph.text = (text='', material=null, fontPath=null, options={}) => {
 		bevelSegments: 5
 	}, options || {})
 
-	material = material || new THREE.MeshBasicMaterial( { color: 0x444444 } );
+	material = material || new THREE.MeshLambertMaterial( { color: 0x999999 } );
 
 	let resultGroup = new THREE.Group()
 	resultGroup.name = "text"
@@ -100,14 +99,16 @@ graph.text = (text='', material=null, fontPath=null, options={}) => {
 	return resultGroup
 }
 
-graph.obj = (path) => {
+graph.obj = (path, successCallback=null, failureCallback=null) => {
 	let geometry = path.split('/')[path.split('/').length - 1]
 	let baseURL = path.substring(0, path.length - geometry.length)
 	let group = graph.group()
 	loadObj(baseURL, geometry).then(obj => {
 		group.add(obj)
+		if(successCallback !== null) successCallback(group, obj)
 	}).catch((...params) => {
 		console.error('could not load obj', ...params)
+		if(failureCallback !== null) failureCallback(group, ...params)
 	})
 	return group
 }
@@ -123,13 +124,16 @@ graph.gltf = (path) => {
 }
 
 graph.meshBasicMaterial = (options) => { return new THREE.MeshBasicMaterial(options) }
+graph.meshLambertMaterial = (options) => { return new THREE.MeshLambertMaterial(options) }
 
 graph.GRAPH_CLASSES = [
 	{ class: 'Scene', name: 'scene' },
 	{ class: 'Group', name: 'group' },
-	{ class: 'Group', name: 'group' },
 	{ class: 'AmbientLight', name: 'ambientLight' },
-	{ class: 'PerspectiveCamera', name: 'perspectiveCamera' }
+	{ class: 'PerspectiveCamera', name: 'perspectiveCamera' },
+	{ class: 'HemisphereLight', name: 'hemisphereLight' },
+	{ class: 'DirectionalLight', name: 'directionalLight' },
+	{ class: 'AmbientLight', name: 'ambientLight' }
 ]
 
 // This loop generates the element generating functions like el.div(...)

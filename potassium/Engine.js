@@ -74,6 +74,7 @@ let Engine = class {
 				}
 				if(this._session !== null){
 					this._session.end()
+					this._glCanvas.style.display = 'none'
 					this._session = null
 				}
 				display.requestSession(sessionInitParamers).then(session => {
@@ -81,6 +82,7 @@ let Engine = class {
 					// Set the session's base layer into which the app will render
 					this._glCanvas.style.width = ''
 					this._glCanvas.style.height = ''
+					this._glCanvas.style.display = 'inherit'
 					this._session.baseLayer = new XRWebGLLayer(this._session, this._glContext)
 					this._session.requestFrame(this._render)
 					resolve(this._mode)
@@ -101,6 +103,7 @@ let Engine = class {
 		return new Promise((resolve, reject) => {
 			if(this._session !== null){
 				this._session.end()
+				this._glCanvas.style.display = 'none'
 				this._session = null
 			}
 			resolve(this._mode)

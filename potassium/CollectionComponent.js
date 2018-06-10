@@ -68,6 +68,7 @@ let CollectionComponent = class extends Component {
 		for(let [id, component] of this._dataObjectComponents){
 			if(component.visible === false) continue
 			component.portalGraph.position.set(component.portalGraph.position.x, y, component.portalGraph.position.z)
+			component.immersiveGraph.position.set(component.immersiveGraph.position.x, y, component.immersiveGraph.position.z)
 			y -= this.options.itemGraphHeight
 		}
 	}
