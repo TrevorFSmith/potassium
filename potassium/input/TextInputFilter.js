@@ -1,6 +1,7 @@
 import Filter from "../../action-input/filter/Filter.js";
 
 /**
+ * TextInputFilter TBD
  */
 export default class TextInputFilter extends Filter {
   constructor() {

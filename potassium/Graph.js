@@ -107,7 +107,6 @@ graph.obj = (path, successCallback=null, failureCallback=null) => {
 		group.add(obj)
 		if(successCallback !== null) successCallback(group, obj)
 	}).catch((...params) => {
-		console.error('could not load obj', ...params)
 		if(failureCallback !== null) failureCallback(group, ...params)
 	})
 	return group
@@ -149,9 +148,23 @@ THREE.Object3D.prototype.prettyPrint = function(depth=0){
 	for(let i=0; i < depth; i++){
 		tabs += '  '
 	}
-	console.log(tabs, this.name || '-', this.position.x, this.position.y, this.position.z)
+	console.log(
+		tabs, 
+		this.name || '-', 
+		this.position.x, this.position.y, this.position.z,
+		'[', this.quaternion.x, this.quaternion.y, this.quaternion.z, this.quaternion.w, ']'
+	)
 	for(let i=0; i < this.children.length; i++){
 		this.children[i].prettyPrint(depth + 1)
+	}
+}
+
+THREE.Object3D.prototype.getComponent = function(){
+	let obj = this
+	while(true){
+		if(obj.component) return obj.component
+		if(!obj.parent) return null
+		obj = obj.parent
 	}
 }
 
@@ -180,17 +193,25 @@ function loadObj(baseURL, geometry){
 		const mtlLoader = new THREE.MTLLoader()
 		mtlLoader.setPath(baseURL)
 		const mtlName = geometry.split('.')[geometry.split(':').length - 1] + '.mtl'
-		mtlLoader.load(mtlName, (materials) => {
-			materials.preload()
-			let objLoader = new THREE.OBJLoader()
-			objLoader.setMaterials(materials)
-			objLoader.setPath(baseURL)
-			objLoader.load(geometry, (obj) => {
-				resolve(obj)
-			}, () => {} , (...params) => {
-				console.error('Failed to load obj', ...params)
+		mtlLoader.load(
+			mtlName,
+			(materials) => {
+				materials.preload()
+				let objLoader = new THREE.OBJLoader()
+				objLoader.setMaterials(materials)
+				objLoader.setPath(baseURL)
+				objLoader.load(geometry, (obj) => {
+					resolve(obj)
+				}, () => {} , (...params) => {
+					console.error('Failed to load obj', ...params)
+					reject(...params)
+				})
+			},
+			() => {},
+			(...params) => {
+				console.error('Failed to load mtl', ...params)
 				reject(...params)
-			})
-		})
+			}
+		)
 	})
 }

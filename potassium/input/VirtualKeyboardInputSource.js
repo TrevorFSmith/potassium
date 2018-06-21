@@ -11,7 +11,9 @@ export default class VirtualKeyboardInputSource extends InputSource {
     /** @type {Set<number>} */
     this._activeKeyCodes = new Set()
 
-    this.keyboardGroup = graph.obj('./js/potassium/input/Kayboard.obj')
+    this.keyboardGroup = graph.obj('./js/potassium/input/Kayboard.obj', null, (...params) => {
+      console.err('Could not load virtual keyboard OBJ', ...params)
+    })
 
     // TODO listen to the virtual keyboard
   }

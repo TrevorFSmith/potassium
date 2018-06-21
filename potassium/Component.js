@@ -16,18 +16,19 @@ let Component = EventMixin(
 
 			// Set up the DOM and 3D graph for the three display modes:
 
-			// Flat display mode elements, including app type controls
+			// Flat display mode elements: page controls
 			this._flatEl = this.options.flatEl || el.div()
 			this._flatEl.component = this
 
-			// Portal display mode overlay controls
+			// Portal display mode elements: overlay controls
 			this._portalEl = this.options.portalEl || el.div()
 			this._portalEl.component = this
-			// Portal display mode 3D graph
+
+			// Portal display mode 3D graph: spatial controls
 			this._portalGraph = this.options.portalGraph || graph.group()
 			this._portalGraph.component = this
 
-			// Immersive display mode 3D graph
+			// Immersive display mode 3D graph: spatial controls
 			this._immersiveGraph = this.options.immersiveGraph || graph.group()
 			this._immersiveGraph.component = this
 
@@ -51,6 +52,13 @@ let Component = EventMixin(
 		Called when a App parent changes display mode: App.FLAT, App.PORTAL, or App.IMMERSIVE
 		*/
 		handleDisplayModeChange(mode){}
+
+		/*
+		Called when an action is targeted at a Component
+		*/
+		handleAction(actionName, value, actionParameters){
+			this.trigger(Component.ActionEvent, actionName, value, actionParameters)
+		}
 
 		get flatEl(){ return this._flatEl }
 		get portalEl(){ return this._portalEl }
@@ -152,6 +160,7 @@ let Component = EventMixin(
 		}
 	}
 )
+Component.ActionEvent = 'component-action-event'
 
 export default Component
 

@@ -20,6 +20,9 @@ let Engine = class {
 		this._camera.name = mode + '-camera'
 		this._scene.add(this._camera)
 
+		this._raycaster = new THREE.Raycaster()
+		this._workingQuat = new THREE.Quaternion()
+
 		this._glCanvas = el.canvas().appendTo(this._el)
 		this._glContext = this._glCanvas.getContext('webgl')
 		if(this._glContext === null){
@@ -36,6 +39,7 @@ let Engine = class {
 		this._session = null // An XRSession
 	}
 	get el(){ return this._el }
+	get scene(){ return this._scene }
 
 	start(){
 		return new Promise((resolve, reject) => {
@@ -109,6 +113,27 @@ let Engine = class {
 			resolve(this._mode)
 		})
 	}
+
+	pickScreen(normalizedMouseX, normalizedMouseY){
+		this._raycaster.setFromCamera({
+			x: normalizedMouseX,
+			y: normalizedMouseY
+		}, this._camera)
+		const intersects = this._raycaster.intersectObjects(this._scene.children, true)
+		if(intersects.length === 0) return null
+		return intersects[0]
+	}
+
+	pickPose(pointObject3D){
+		this._raycaster.ray.origin.setFromMatrixPosition(pointObject3D.matrixWorld)
+		pointObject3D.getWorldQuaternion(this._workingQuat)
+		this._raycaster.ray.direction.set(0, 0, -1).applyQuaternion(this._workingQuat)
+		this._raycaster.ray.direction.normalize()
+		const intersects = this._raycaster.intersectObjects(this._scene.children, true)
+		if(intersects.length === 0) return null
+		return intersects[0]
+	}
+
 	_render(frame){
 		if(this._session === null){
 			return
@@ -117,18 +142,21 @@ let Engine = class {
 			this._tickCallback()
 		}
 		this._session.requestFrame(this._render)
-		if(typeof frame === 'number') return // This happens when switching from window.requestAnimationFrame to session.requestFrame
+
 		const headPose = frame.getDisplayPose(frame.getCoordinateSystem(XRCoordinateSystem.HEAD_MODEL))
+
 		this._renderer.autoClear = false
 		this._renderer.setSize(this._session.baseLayer.framebufferWidth, this._session.baseLayer.framebufferHeight, false)
 		this._renderer.clear()
 		this._camera.matrixAutoUpdate = false
+
 		// Render each view into this._session.baseLayer.context
 		for(const view of frame.views){
 			// Each XRView has its own projection matrix, so set the camera to use that
-			this._camera.projectionMatrix.fromArray(view.projectionMatrix)
 			this._camera.matrix.fromArray(headPose.poseModelMatrix)
-			this._camera.updateMatrixWorld(true)
+			this._camera.updateMatrixWorld()
+			this._camera.projectionMatrix.fromArray(view.projectionMatrix)
+
 			// Set up the renderer to the XRView's viewport and then render
 			this._renderer.clearDepth()
 			const viewport = view.getViewport(this._session.baseLayer)
