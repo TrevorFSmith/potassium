@@ -4,6 +4,7 @@ import Engine from './Engine.js'
 import Router from './Router.js'
 import Component from './Component.js'
 import EventMixin from './EventMixin.js'
+import {throttledConsoleLog} from './throttle.js'
 
 import ActionMap from '../action-input/action/ActionMap.js'
 import ClickFilter from '../action-input/filter/ClickFilter.js'
@@ -36,7 +37,9 @@ let App = EventMixin(
 			this._displayMode = App.FLAT
 
 			this._virtualKeyboardInputSource = new VirtualKeyboardInputSource()
-			this._virtualKeyboardInputSource.keyboardGroup.visible = false
+			this._virtualKeyboardInputSource.keyboardGroup.scale.set(0.5, 0.5, 0.5)
+			this._virtualKeyboardInputSource.keyboardGroup.quaternion.setFromEuler(graph.euler(0, -45, 0))
+			this._virtualKeyboardInputSource.keyboardGroup.position.set(0.8, 0, -0.8)
 			
 			this._pickingInputSource = new PickingInputSource()
 
@@ -57,9 +60,30 @@ let App = EventMixin(
 			this._actionManager.addActionMap('immersive', new ActionMap([...this._actionManager.filters], '/input/immersive-action-map.json'))
 			this._actionManager.switchToActionMaps('flat')
 
+			// Route activate actions to the target Component
 			this._actionManager.addActionListener('/action/activate', (actionName, value, actionParameters) => {
 				if(actionParameters !== null && actionParameters.targetComponent){
 					actionParameters.targetComponent.handleAction(actionName, value, actionParameters)
+				}
+				if(value && actionParameters !== null && actionParameters.pointer === 'left'){
+					this._virtualKeyboardInputSource.handleLeftActivate()
+				}
+				if(value && actionParameters !== null && actionParameters.pointer === 'right'){
+					this._virtualKeyboardInputSource.handleRightActivate()
+				}
+			})
+
+			this._actionManager.addActionListener('/action/activate-dom', (actionName, value, actionParameters) => {
+				console.log('activate-dom', value, actionName, actionParameters)
+				if(actionParameters !== null && actionParameters.targetComponent){
+					actionParameters.targetComponent.handleAction('/action/activate', value, actionParameters)
+				}
+			})
+
+			// Route text input actions to the Component that has text input focus
+			this._actionManager.addActionListener('/action/text-input', (actionName, value, actionParameters) => {
+				if(Component.TextInputFocus !== null){
+					Component.TextInputFocus.handleAction(actionName, value, actionParameters)
 				}
 			})
 
@@ -84,15 +108,26 @@ let App = EventMixin(
 			/** Immersive display mode 3D scene */
 			this._immersiveEl = el.div({ class: 'immersive-root' }).appendTo(this._el)
 			this._immersiveScene = graph.scene()
-			this._leftHand = graph.group(this._makeHand(0x9999FF)).appendTo(this._immersiveScene)
-			this._rightHand = graph.group(this._makeHand(0xFF9999)).appendTo(this._immersiveScene)
-			this._immersiveScene.add(this._virtualKeyboardInputSource.keyboardGroup)
 			this._immersiveCamera = graph.perspectiveCamera([45, 1, 0.5, 10000])
 			this._immersiveEngine = graph.engine(this._immersiveScene, this._immersiveCamera, Engine.IMMERSIVE, this._handleImmersiveTick)
 
+			/* Set up hands and pointers */
+			this._leftHand = graph.group(this._makeHand(0x9999FF)).appendTo(this._immersiveScene)
+			this._leftPointer = this._makePointer(0x99FF99)
+			this._leftPointer.visible = false
+			this._leftHand.add(this._leftPointer)
+			this._rightHand = graph.group(this._makeHand(0xFF9999)).appendTo(this._immersiveScene)
+			this._rightPointer = this._makePointer(0x99FF99)
+			this._rightPointer.visible = false
+			this._rightHand.add(this._rightPointer)
+			/* Set up the virtual keyboard */
+			this._immersiveScene.add(this._virtualKeyboardInputSource.keyboardGroup)
+
 			// When the mode changes, notify all of the children Components
-			// TODO use a better method than flatEl traversal
 			this.addListener((eventName, mode) => {
+				this._actionManager.switchToActionMaps(mode)
+
+				// TODO use a better method than flatEl traversal
 				const dive = (node) => {
 					if(typeof node.component !== 'undefined' && typeof node.component.handleDisplayModeChange === 'function'){
 						node.component.handleDisplayModeChange(mode)
@@ -101,8 +136,6 @@ let App = EventMixin(
 						dive(node.children[i])
 					}
 				}
-				this._actionManager.switchToActionMaps(mode)
-
 				dive(this._flatEl)
 			}, App.DisplayModeChangedEvent)
 
@@ -196,6 +229,18 @@ let App = EventMixin(
 			})
 		}
 
+		_makePointer(color){
+			const material = graph.lineBasicMaterial({ color: color })
+			const geometry = graph.geometry()
+			geometry.vertices.push(
+				graph.vector3(0, 0, 0),
+				graph.vector3(0, 0, -1000)
+			)
+			const pointer = graph.line(geometry, material)
+			pointer.name = 'pointer'
+			return pointer
+		}
+
 		_handlePortalTick(){
 			// Update picking
 			this._pickingInputSource.clearIntersectObjects()
@@ -208,24 +253,32 @@ let App = EventMixin(
 		}
 
 		_handleImmersiveTick(){
-			// Update hand poses
+			// Update hand poses, visibility, and pointers
 			const leftPosition = this._actionManager.queryInputPath('/input/gamepad/left/position')[0]
-			if(leftPosition) this._leftHand.position.set(...leftPosition)
+			if(leftPosition){
+				this._leftHand.position.set(...leftPosition)
+			} else {
+				this._leftHand.position.set(...App.DefaultLeftHandPosition)
+			}
 			const leftOrientation = this._actionManager.queryInputPath('/input/gamepad/left/orientation')[0]
 			if(leftOrientation) {
 				this._leftHand.quaternion.set(...leftOrientation)
-				this._leftHand.updateMatrix()
+				this._leftPointer.visible = this._actionManager.queryInputPath('/input/gamepad/left/button/0/touched')[0] || false
 				this._leftHand.visible = true
 			} else {
 				// If it's not at least a 3dof controller, we don't show it
 				this._leftHand.visible = false
 			}
 			const rightPosition = this._actionManager.queryInputPath('/input/gamepad/right/position')[0]
-			if(rightPosition) this._rightHand.position.set(...rightPosition)
+			if(rightPosition){
+				this._rightHand.position.set(...rightPosition)
+			} else {
+				this._rightHand.position.set(...App.DefaultRightHandPosition)
+			}
 			const rightOrientation = this._actionManager.queryInputPath('/input/gamepad/right/orientation')[0]
 			if(rightOrientation){
 				this._rightHand.quaternion.set(...rightOrientation)
-				this._rightHand.updateMatrix()
+				this._rightPointer.visible = this._actionManager.queryInputPath('/input/gamepad/right/button/0/touched')[0] || false
 				this._rightHand.visible = true
 			} else {
 				// If it's not at least a 3dof controller, we don't show it
@@ -233,15 +286,25 @@ let App = EventMixin(
 			}
 
 			// Update picking
-			this._immersiveEngine.scene.updateMatrixWorld(true)
 			this._pickingInputSource.clearIntersectObjects()
-			if(this._leftHand.visible){
-				this._pickingInputSource.left = this._immersiveEngine.pickPose(this._leftHand)
+			if(this._leftHand.visible && this._leftPointer.visible){
+				this._leftHand.visible = false
+				this._pickingInputSource.left = this._immersiveEngine.pickPose(this._leftPointer)
+				this._leftHand.visible = true
+			} else {
+				this._pickingInputSource.left = null
 			}
-			if(this._rightHand.visible){
-				this._pickingInputSource.right = this._immersiveEngine.pickPose(this._rightHand)
+			if(this._rightHand.visible && this._rightPointer.visible){
+				this._rightHand.visible = false
+				this._pickingInputSource.right = this._immersiveEngine.pickPose(this._rightPointer)
+				this._rightHand.visible = true
+			} else {
+				this._pickingInputSource.right = null
 			}
-
+			this._virtualKeyboardInputSource.handlePick(
+				this._pickingInputSource.left,
+				this._pickingInputSource.right
+			)
 			this._actionManager.poll()
 		}
 
@@ -259,6 +322,9 @@ let App = EventMixin(
 		}
 	}
 )
+
+App.DefaultLeftHandPosition = [-0.1, -0.4, -0.2]
+App.DefaultRightHandPosition = [0.1, -0.4, -0.2]
 
 App.FLAT = 'flat'
 App.PORTAL = 'portal'

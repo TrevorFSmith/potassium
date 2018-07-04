@@ -1,5 +1,7 @@
 import Filter from "../../action-input/filter/Filter.js";
 
+import Component from '../Component.js'
+
 /**
  * TextInputFilter TBD
  */
@@ -17,6 +19,7 @@ export default class TextInputFilter extends Filter {
    * @return {Array} [value, actionParameters]
    */
   filter(inputPath, inputValue, filterPath, filterParameters) {
-    return [null, null];
+    if(!inputValue) return [null, null]
+    return [true, { value: inputValue }];
   }
 }

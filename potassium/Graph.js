@@ -122,9 +122,27 @@ graph.gltf = (path) => {
 	return group
 }
 
-graph.meshBasicMaterial = (options) => { return new THREE.MeshBasicMaterial(options) }
-graph.meshLambertMaterial = (options) => { return new THREE.MeshLambertMaterial(options) }
+/*
+The methods created from these info just pass through any params to the class constructor.
+For example, creating a MeshBasicMaterial will be graph.meshBasicMaterial(...params).
+*/
+graph.SUPPORT_CLASSES = [
+	{ class: 'Line', name: 'line' },
+	{ class: 'Euler', name: 'euler' },
+	{ class: 'Vector3', name: 'vector3' },
+	{ class: 'Geometry', name: 'geometry' },
+	{ class: 'MeshBasicMaterial', name: 'meshBasicMaterial' },
+	{ class: 'LineBasicMaterial', name: 'lineBasicMaterial' },
+	{ class: 'MeshLambertMaterial', name: 'meshLambertMaterial' }
+]
+for(let classInfo of graph.SUPPORT_CLASSES){
+	const innerClazz = classInfo.class
+	graph[classInfo.name] = function(...params){
+		return new THREE[innerClazz](...params)
+	}
+}
 
+// The methods created from these classes use the graph.nodeFuction (see below)
 graph.GRAPH_CLASSES = [
 	{ class: 'Scene', name: 'scene' },
 	{ class: 'Group', name: 'group' },

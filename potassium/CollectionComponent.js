@@ -110,6 +110,7 @@ let CollectionComponent = class extends Component {
 		this._dataObjectComponents.set(itemComponent.dataObject.get('id'), itemComponent)
 
 		this._ul.appendChild(itemComponent.flatEl)
+		// TODO switch to action-input
 		if(this.options.onClick){
 			itemComponent.flatEl.addEventListener('click', (ev) => { this._handleItemClick(ev, itemComponent) })
 		}
