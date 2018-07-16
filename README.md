@@ -8,5 +8,5 @@ Eventually, PotassiumES will have a nice home at PotassiumES.org, which doesn't 
 
 Stay wide,
 
-- Trevor
+Trevor F. Smith, July 15th 2018
 
